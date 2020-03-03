@@ -7,7 +7,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 
-class StepSensorInbuilt(context: Context): SensorEventListener,
+class StepSensorInbuilt(context: Context) : SensorEventListener,
     StepSensor {
     val sensorManager = context.getSystemService(Service.SENSOR_SERVICE) as SensorManager
     val sensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
