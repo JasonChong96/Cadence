@@ -6,6 +6,7 @@ import android.drm.DrmStore;
 import android.media.MediaPlayer;
 
 import com.cs4347.cadence.MainActivity;
+import com.cs4347.cadence.R;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -21,6 +22,7 @@ public class MediaPlayerHolder implements PlayerAdapter{
     private PlaybackInfoListener mPlaybackInfoListener;
     private ScheduledExecutorService mExecutor;
     private Runnable mSeekbarPositionUpdateTask;
+    private SongSelector songLibrary;
 
     public MediaPlayerHolder(Context context) {
         mContext = context.getApplicationContext();
@@ -36,6 +38,7 @@ public class MediaPlayerHolder implements PlayerAdapter{
      */
     private void initializeMediaPlayer() {
         if (mMediaPlayer == null) {
+            songLibrary = new SongSelector();
             mMediaPlayer = new MediaPlayer();
             mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                @Override
@@ -56,10 +59,10 @@ public class MediaPlayerHolder implements PlayerAdapter{
     }
 
     @Override
-    public void loadMedia(int resourceId) {
-        mResourceId = resourceId;
-
+    public void loadMedia(int bpm) {
         initializeMediaPlayer();
+
+        mResourceId = songLibrary.getNextSong(bpm);
 
         AssetFileDescriptor assetFileDescriptor = mContext.getResources().openRawResourceFd(mResourceId);
 
@@ -112,7 +115,7 @@ public class MediaPlayerHolder implements PlayerAdapter{
         if (mMediaPlayer != null) {
             logToUI("playbackReset()");
             mMediaPlayer.reset();
-            loadMedia(mResourceId);
+//            loadMedia(120);
             if (mPlaybackInfoListener != null) {
                 mPlaybackInfoListener.onStateChanged(PlaybackInfoListener.State.RESET);
             }
@@ -194,8 +197,8 @@ public class MediaPlayerHolder implements PlayerAdapter{
     }
 
     private void logToUI(String message) {
-//        if (mPlaybackInfoListener != null) {
-//            mPlaybackInfoListener.onLogUpdated(message);
-//        }
+        if (mPlaybackInfoListener != null) {
+            mPlaybackInfoListener.onLogUpdated(message);
+        }
     }
 }

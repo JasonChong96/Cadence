@@ -7,7 +7,7 @@ import com.cs4347.cadence.MainActivity;
  */
 public interface PlayerAdapter {
 
-    void loadMedia(int resourceId);
+    void loadMedia(int bpm);
 
     void release();
 

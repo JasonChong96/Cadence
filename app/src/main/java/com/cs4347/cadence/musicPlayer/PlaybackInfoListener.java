@@ -2,6 +2,8 @@ package com.cs4347.cadence.musicPlayer;
 
 //import android.support.annotation.IntDef;
 
+import androidx.annotation.IntDef;
+
 import com.cs4347.cadence.MainActivity;
 
 import java.lang.annotation.Retention;
@@ -13,9 +15,9 @@ import java.lang.annotation.RetentionPolicy;
  */
 public abstract class PlaybackInfoListener {
 
-//    @IntDef({State.INVALID, State.PLAYING, State.PAUSED, State.RESET, State.COMPLETED})
+    @IntDef({State.INVALID, State.PLAYING, State.PAUSED, State.RESET, State.COMPLETED})
     @Retention(RetentionPolicy.SOURCE)
-    @interface State {
+    public @interface State {
 
         int INVALID = -1;
         int PLAYING = 0;
@@ -48,7 +50,7 @@ public abstract class PlaybackInfoListener {
         return stateString;
     }
 
-    void onLogUpdated(String formattedMessage) {
+    public void onLogUpdated(String formattedMessage) {
     }
 
     void onDurationChanged(int duration) {
@@ -57,9 +59,9 @@ public abstract class PlaybackInfoListener {
     void onPositionChanged(int position) {
     }
 
-    void onStateChanged(@State int state) {
+    public void onStateChanged(@State int state) {
     }
 
-    void onPlaybackCompleted() {
+    public void onPlaybackCompleted() {
     }
 }

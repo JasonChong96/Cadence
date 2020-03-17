@@ -16,10 +16,8 @@ class MainActivity : AppCompatActivity() {
     var isStarted = false
     var toggleSemaphore = Semaphore(1)
 
-    private val MEDIA_RES_ID = R.raw.song
     private lateinit var mPlayerAdapter : MediaPlayerHolder
     lateinit var mTextDebug: TextView
-//    private lateinit var mScrollContainer: ScrollView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,13 +29,12 @@ class MainActivity : AppCompatActivity() {
         isStarted = true
         button.text = "Stop"
         initializeUI()
-//        initializeSeekbar();
         initializePlaybackController()
     }
 
     override fun onStart() {
         super.onStart()
-        mPlayerAdapter.loadMedia(MEDIA_RES_ID)
+        mPlayerAdapter.loadMedia(120)
     }
 
     override fun onStop() {
@@ -101,36 +98,27 @@ class MainActivity : AppCompatActivity() {
         mPlayerAdapter = mMediaPlayerHolder
     }
 
-    class PlaybackListener : PlaybackInfoListener() {
-        fun onDurationChanged(duration: Int) {
-
+    inner class PlaybackListener : PlaybackInfoListener() {
+        override fun onStateChanged(@State state: Int) {
+            val stateToString = convertStateToString(state)
+            onLogUpdated(String.format("onStateChanged(%s)", stateToString))
         }
 
-        fun onPositionChanged(position: Int) {
-//            if (!mUserIsSeeking) {
-//                mSeekbarAudio.setProgress(position, true)
-//                Log.d(
-//                    FragmentActivity.TAG,
-//                    String.format("setPlaybackPosition: setProgress(%d)", position)
-//                )
-//            }
+        override fun onPlaybackCompleted() {
+            mPlayerAdapter.reset()
+            mPlayerAdapter.loadMedia(109)
+            mPlayerAdapter.play()
+            onLogUpdated("Playback Completed")
         }
 
-//        fun onStateChanged(@State state: Int) {
-////            val stateToString = convertStateToString(state)
-////            onLogUpdated(String.format("onStateChanged(%s)", stateToString))
-//        }
-
-        fun onPlaybackCompleted() {}
-
-//        fun onLogUpdated(message: String?) {
-//            if (mTextDebug != null) {
-//                mTextDebug.append(message)
-//                mTextDebug.append("\n")
-//                // Moves the scrollContainer focus to the end.
+        override fun onLogUpdated(message: String?) {
+            if (mTextDebug != null) {
+                mTextDebug.append(message)
+                mTextDebug.append("\n")
+                // Moves the scrollContainer focus to the end.
 //                mScrollContainer.post(
 //                    Runnable { mScrollContainer.fullScroll(ScrollView.FOCUS_DOWN) })
-//            }
-//        }
+            }
+        }
     }
 }
