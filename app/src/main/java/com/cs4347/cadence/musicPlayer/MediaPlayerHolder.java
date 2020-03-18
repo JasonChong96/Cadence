@@ -11,7 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class MediaPlayerHolder implements PlayerAdapter{
+public class MediaPlayerHolder implements PlayerAdapter {
 
     private static final int PLAYBACK_POSITION_REFRESH_INTERVAL_MS = 1000;
     private static final int SONG_CHANGE_INTERVAL = 5000;
@@ -42,15 +42,15 @@ public class MediaPlayerHolder implements PlayerAdapter{
             songLibrary = new SongSelector();
             mMediaPlayer = new MediaPlayer();
             mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-               @Override
-               public void onCompletion(MediaPlayer mediaPlayer) {
-                   stopUpdatingCallbackWithPosition(true);
+                @Override
+                public void onCompletion(MediaPlayer mediaPlayer) {
+                    stopUpdatingCallbackWithPosition(true);
 //                   logToUI("MediaPlayer playback completed");
-                   if (mPlaybackInfoListener != null) {
-                       mPlaybackInfoListener.onStateChanged(PlaybackInfoListener.State.COMPLETED);
-                       mPlaybackInfoListener.onPlaybackCompleted();
-                   }
-               }
+                    if (mPlaybackInfoListener != null) {
+                        mPlaybackInfoListener.onStateChanged(PlaybackInfoListener.State.COMPLETED);
+                        mPlaybackInfoListener.onPlaybackCompleted();
+                    }
+                }
             });
         }
     }
@@ -204,16 +204,18 @@ public class MediaPlayerHolder implements PlayerAdapter{
     }
 
     synchronized public void updateBpm(int newBpm) {
-        logToUI(String.format(Locale.ENGLISH, "BGM Updated %d",
-                newBpm));
-        if (System.currentTimeMillis() - lastLoadTime < SONG_CHANGE_INTERVAL) {
+        logToUI(String.format(Locale.ENGLISH, "BGM Updated %d. Should change bpm: %b. Time from last: %d",
+                newBpm, songLibrary.isShouldChangeBpm(newBpm), System.currentTimeMillis() - lastLoadTime));
+        if (System.currentTimeMillis() - lastLoadTime < SONG_CHANGE_INTERVAL || !songLibrary.isShouldChangeBpm(newBpm)) {
             return;
         }
+        boolean isAutoStart = mMediaPlayer.isPlaying();
         lastLoadTime = System.currentTimeMillis();
         reset();
         loadMedia(newBpm);
-        if (mMediaPlayer != null && mMediaPlayer.isPlaying()) {
-            mMediaPlayer.seekTo(60000);
+        if (mMediaPlayer != null && isAutoStart) {
+            mMediaPlayer.seekTo(
+                    mMediaPlayer.getDuration() / 2);
             play();
         }
     }

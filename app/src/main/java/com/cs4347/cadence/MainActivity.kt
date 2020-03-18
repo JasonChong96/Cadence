@@ -1,15 +1,19 @@
 package com.cs4347.cadence
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.Manifest
+import android.app.Activity
+import android.content.*
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
-import android.widget.ScrollView
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.bluetoothscanning.BluetoothConfig
+import com.bluetoothscanning.Config
 import com.cs4347.cadence.musicPlayer.MediaPlayerHolder
 import com.cs4347.cadence.musicPlayer.PlaybackInfoListener
 import java.util.concurrent.Semaphore
@@ -17,19 +21,16 @@ import kotlin.math.roundToInt
 
 
 class MainActivity : AppCompatActivity() {
-    var isStarted = false
-    var toggleSemaphore = Semaphore(1)
+    private var isStarted = false
+    private var toggleSemaphore = Semaphore(1)
 
-    private lateinit var mPlayerAdapter : MediaPlayerHolder
+    private lateinit var mPlayerAdapter: MediaPlayerHolder
     lateinit var mTextDebug: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        Intent(this, CadenceTrackerService::class.java).also { intent ->
-            startService(intent)
-        }
+        setContentView(R.layout.cadence_activity_main)
         val button = findViewById<Button>(R.id.button2)
         isStarted = true
         button.text = "Stop"
@@ -38,23 +39,90 @@ class MainActivity : AppCompatActivity() {
         registerReceiver(object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 mPlayerAdapter.updateBpm(
-                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt())
+                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
+                )
             }
         }, IntentFilter("com.cadence.stepsChanged"))
+
     }
 
     override fun onStart() {
         super.onStart()
+        if (IS_USING_ESENSE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED
+                ) {
+                    if (checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                        != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+                            val builder = AlertDialog.Builder(this)
+                            builder.setTitle("This app needs background location access")
+                            builder.setMessage("Please grant location access so this app can detect beacons in the background.")
+                            builder.setPositiveButton(android.R.string.ok, null)
+                            builder.setOnDismissListener(DialogInterface.OnDismissListener {
+                                requestPermissions(
+                                    arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                                    PERMISSION_REQUEST_BACKGROUND_LOCATION
+                                )
+                            })
+                            builder.show()
+                        } else {
+                            val builder = AlertDialog.Builder(this)
+                            builder.setTitle("Functionality limited")
+                            builder.setMessage("Since background location access has not been granted, this app will not be able to discover beacons in the background.  Please go to Settings -> Applications -> Permissions and grant background location access to this app.")
+                            builder.setPositiveButton(android.R.string.ok, null)
+                            builder.setOnDismissListener(DialogInterface.OnDismissListener { })
+                            builder.show()
+                        }
+                    }
+                } else {
+                    if (!shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                        requestPermissions(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                            ),
+                            PERMISSION_REQUEST_FINE_LOCATION
+                        )
+                    } else {
+                        val builder = AlertDialog.Builder(this)
+                        builder.setTitle("Functionality limited")
+                        builder.setMessage("Since location access has not been granted, this app will not be able to discover beacons.  Please go to Settings -> Applications -> Permissions and grant location access to this app.")
+                        builder.setPositiveButton(android.R.string.ok, null)
+                        builder.setOnDismissListener(DialogInterface.OnDismissListener { })
+                        builder.show()
+                    }
+                }
+            }
+            val deviceName = intent.getStringExtra("DEVICE_NAME")
+            if (deviceName != null) {
+                Intent(this, CadenceTrackerEsenseService::class.java).also { intent ->
+                    intent.putExtra("DEVICE_NAME", deviceName)
+                    this.startService(intent)
+                }
+            } else {
+                ActivityCodeBuilder(this, 1)
+                    .setBackgroundColor(Color.parseColor("#1E90FF"))
+                    .setPulseColor(Color.parseColor("#ffffff"))
+                    .start()
+            }
+        } else {
+            Intent(this, CadenceTrackerService::class.java).also { intent ->
+                startService(intent)
+            }
+        }
         mPlayerAdapter.loadMedia(120)
     }
 
     override fun onStop() {
         super.onStop()
         if (isChangingConfigurations && mPlayerAdapter.isPlaying) {
-
-        } else {
-            mPlayerAdapter.release()
+            return
         }
+
+        mPlayerAdapter.release()
     }
 
     fun toggleCounting(view: View) {
@@ -85,24 +153,21 @@ class MainActivity : AppCompatActivity() {
         button.text = "Start"
     }
 
-    private fun initializeUI(){
+    private fun initializeUI() {
         mTextDebug = findViewById<TextView>(R.id.textView)
 
         val mPlayButton = findViewById<Button>(R.id.play_button)
         mPlayButton.text = "Play"
 
-        val mPauseButton = findViewById<Button>(R.id.pause_button)
-        mPauseButton.text = "Pause"
+        val mClearButton = findViewById<Button>(R.id.clear_button)
+        mClearButton.text = "Clear"
 
         val mResetButton = findViewById<Button>(R.id.reset_button)
         mResetButton.text = "Stop"
 
-        mPlayButton.setOnClickListener  { mPlayerAdapter.play() }
-        mPauseButton.setOnClickListener { mPlayerAdapter.pause()
-
-            sendBroadcast(Intent("com.cadence.stepsChanged").also {
-                it.putExtra("STEPS_PER_MINUTE", 120f.toDouble())
-            })
+        mPlayButton.setOnClickListener { mPlayerAdapter.play() }
+        mClearButton.setOnClickListener {
+            mTextDebug.text = ""
         }
         mResetButton.setOnClickListener { mPlayerAdapter.reset() }
 
@@ -136,5 +201,21 @@ class MainActivity : AppCompatActivity() {
 //                    Runnable { mScrollContainer.fullScroll(ScrollView.FOCUS_DOWN) })
             }
         }
+    }
+
+    companion object {
+        private val PERMISSION_REQUEST_FINE_LOCATION = 1
+        private val PERMISSION_REQUEST_BACKGROUND_LOCATION = 2
+    }
+}
+
+
+class ActivityCodeBuilder(private val activity: Activity, private val code: Int) :
+    BluetoothConfig.Builder(activity) {
+    override fun start() {
+        val intent = Intent(activity, CadenceBluetoothDetection::class.java)
+        intent.putExtra(Config.EXTRA_CONFIG, config)
+        intent.putExtra(Config.EXTRA_Listener, listener)
+        activity.startActivityForResult(intent, code)
     }
 }

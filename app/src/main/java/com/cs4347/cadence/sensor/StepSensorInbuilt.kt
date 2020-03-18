@@ -8,22 +8,14 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 
 class StepSensorInbuilt(context: Context) : SensorEventListener,
-    StepSensor {
-    val sensorManager = context.getSystemService(Service.SENSOR_SERVICE) as SensorManager
-    val sensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
-    val listeners: MutableList<StepListener> = ArrayList()
+    StepSensor() {
+    private val sensorManager = context.getSystemService(Service.SENSOR_SERVICE) as SensorManager
+    private val sensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
 
     init {
         sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_FASTEST)
     }
 
-    override fun registerListener(stepListener: StepListener) {
-        listeners.add(stepListener)
-    }
-
-    override fun unregisterListener(stepListener: StepListener) {
-        listeners.remove(stepListener)
-    }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
         print("Accuracy Changed")
@@ -31,10 +23,7 @@ class StepSensorInbuilt(context: Context) : SensorEventListener,
 
     override fun stop() {
         sensorManager.unregisterListener(this)
-        listeners.forEach {
-            it.sensorStopped()
-        }
-        listeners.clear()
+        super.stop()
     }
 
     override fun onSensorChanged(event: SensorEvent) {

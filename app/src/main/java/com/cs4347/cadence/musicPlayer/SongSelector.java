@@ -6,6 +6,7 @@ import com.cs4347.cadence.R;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.TreeMap;
 
 public class SongSelector {
@@ -38,9 +39,17 @@ public class SongSelector {
 
         // Change in BPM, exact BPM not found in library. Find closest and play first song
 
+        currentBpm = getBestFitBpm(bpm);
+        currentTrackNo = 0;
+        return songLibrary.get(currentBpm).get(currentTrackNo);
+
+
+    }
+
+    private int getBestFitBpm(int bpm) {
         int doubleTimeBpm = 2 * bpm;
 
-        int [] differences = new int[4];
+        int[] differences = new int[4];
 
         try {
             differences[0] = songLibrary.lowerKey(bpm); // Closest Lowest BPM
@@ -67,32 +76,29 @@ public class SongSelector {
         int min_index = 0;
         for (int i = 1; i < differences.length; i++) {
             int current_difference = Math.abs(bpm - differences[i]);
-            if (current_difference < min_difference){
+            if (current_difference < min_difference) {
                 min_difference = current_difference;
                 min_index = i;
             }
         }
+        System.out.println(Arrays.toString(differences));
+        System.out.println(min_index);
 
-        currentBpm = differences[min_index];
-        currentTrackNo = 0;
-        return songLibrary.get(currentBpm).get(currentTrackNo);
-
-
+        return differences[min_index];
     }
 
     private void populateLibrary() {
         Field[] fields = R.raw.class.getFields();
         for (int i = 0; i < fields.length - 1; i++) {
             String name = fields[i].getName();
-            String [] details = name.split("_");
-            if (details.length == 1){
+            String[] details = name.split("_");
+            if (details.length == 1) {
                 continue;
             }
             int bpm = Integer.parseInt(details[details.length - 1]);
-
             @RawRes int resourceId = 0;
             try {
-                resourceId = (Integer)fields[i].get(null);
+                resourceId = (Integer) fields[i].get(null);
             } catch (Exception e) {
 
             }
@@ -106,11 +112,16 @@ public class SongSelector {
             }
         }
     }
+
     public int getCurrentTrackNo() {
         return currentTrackNo;
     }
 
     public void setCurrentTrackNo(int currentTrackNo) {
         this.currentTrackNo = currentTrackNo;
+    }
+
+    public boolean isShouldChangeBpm(int newBpm) {
+        return getBestFitBpm(newBpm) != currentBpm;
     }
 }
