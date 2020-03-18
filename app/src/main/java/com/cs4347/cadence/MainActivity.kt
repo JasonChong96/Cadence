@@ -1,6 +1,9 @@
 package com.cs4347.cadence
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -10,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.cs4347.cadence.musicPlayer.MediaPlayerHolder
 import com.cs4347.cadence.musicPlayer.PlaybackInfoListener
 import java.util.concurrent.Semaphore
+import kotlin.math.roundToInt
 
 
 class MainActivity : AppCompatActivity() {
@@ -20,6 +24,7 @@ class MainActivity : AppCompatActivity() {
     lateinit var mTextDebug: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         Intent(this, CadenceTrackerService::class.java).also { intent ->
@@ -30,6 +35,12 @@ class MainActivity : AppCompatActivity() {
         button.text = "Stop"
         initializeUI()
         initializePlaybackController()
+        registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                mPlayerAdapter.updateBpm(
+                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt())
+            }
+        }, IntentFilter("com.cadence.stepsChanged"))
     }
 
     override fun onStart() {
@@ -87,7 +98,12 @@ class MainActivity : AppCompatActivity() {
         mResetButton.text = "Stop"
 
         mPlayButton.setOnClickListener  { mPlayerAdapter.play() }
-        mPauseButton.setOnClickListener { mPlayerAdapter.pause() }
+        mPauseButton.setOnClickListener { mPlayerAdapter.pause()
+
+            sendBroadcast(Intent("com.cadence.stepsChanged").also {
+                it.putExtra("STEPS_PER_MINUTE", 120f.toDouble())
+            })
+        }
         mResetButton.setOnClickListener { mPlayerAdapter.reset() }
 
     }
@@ -105,9 +121,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onPlaybackCompleted() {
-            mPlayerAdapter.reset()
-            mPlayerAdapter.loadMedia(109)
-            mPlayerAdapter.play()
+//            mPlayerAdapter.reset()
+//            mPlayerAdapter.loadMedia(109)
+//            mPlayerAdapter.play()
             onLogUpdated("Playback Completed")
         }
 

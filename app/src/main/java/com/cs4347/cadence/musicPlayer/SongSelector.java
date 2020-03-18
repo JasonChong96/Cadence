@@ -9,12 +9,13 @@ import java.util.ArrayList;
 import java.util.TreeMap;
 
 public class SongSelector {
-    TreeMap<Integer, ArrayList<Integer>> songLibrary;
-    int currentBpm;
-    int currentTrackNo;
+    private TreeMap<Integer, ArrayList<Integer>> songLibrary;
+
+    private int currentBpm;
+    private int currentTrackNo;
 
     public SongSelector() {
-        songLibrary = new TreeMap<Integer, ArrayList<Integer>>();
+        songLibrary = new TreeMap<>();
         currentBpm = 0;
         currentTrackNo = 0;
         populateLibrary();
@@ -104,5 +105,12 @@ public class SongSelector {
                 songLibrary.put(bpm, songList);
             }
         }
+    }
+    public int getCurrentTrackNo() {
+        return currentTrackNo;
+    }
+
+    public void setCurrentTrackNo(int currentTrackNo) {
+        this.currentTrackNo = currentTrackNo;
     }
 }

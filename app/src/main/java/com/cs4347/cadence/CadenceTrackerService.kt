@@ -60,7 +60,9 @@ open class CadenceTrackerService : Service(),
         if (lastStepDeltas.contains(-1) || channelId == null) {
             return
         }
-
+        sendBroadcast(Intent("com.cadence.stepsChanged").also {
+            it.putExtra("STEPS_PER_MINUTE", getStepsPerMinute())
+        })
         updateNotification()
     }
 

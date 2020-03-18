@@ -2,12 +2,11 @@ package com.cs4347.cadence.musicPlayer;
 
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
-import android.drm.DrmStore;
 import android.media.MediaPlayer;
 
 import com.cs4347.cadence.MainActivity;
-import com.cs4347.cadence.R;
 
+import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -15,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 public class MediaPlayerHolder implements PlayerAdapter{
 
     private static final int PLAYBACK_POSITION_REFRESH_INTERVAL_MS = 1000;
+    private static final int SONG_CHANGE_INTERVAL = 5000;
 
     private final Context mContext;
     private MediaPlayer mMediaPlayer;
@@ -23,6 +23,7 @@ public class MediaPlayerHolder implements PlayerAdapter{
     private ScheduledExecutorService mExecutor;
     private Runnable mSeekbarPositionUpdateTask;
     private SongSelector songLibrary;
+    private long lastLoadTime;
 
     public MediaPlayerHolder(Context context) {
         mContext = context.getApplicationContext();
@@ -199,6 +200,21 @@ public class MediaPlayerHolder implements PlayerAdapter{
     private void logToUI(String message) {
         if (mPlaybackInfoListener != null) {
             mPlaybackInfoListener.onLogUpdated(message);
+        }
+    }
+
+    synchronized public void updateBpm(int newBpm) {
+        logToUI(String.format(Locale.ENGLISH, "BGM Updated %d",
+                newBpm));
+        if (System.currentTimeMillis() - lastLoadTime < SONG_CHANGE_INTERVAL) {
+            return;
+        }
+        lastLoadTime = System.currentTimeMillis();
+        reset();
+        loadMedia(newBpm);
+        if (mMediaPlayer != null && mMediaPlayer.isPlaying()) {
+            mMediaPlayer.seekTo(60000);
+            play();
         }
     }
 }
