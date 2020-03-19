@@ -19,12 +19,13 @@ import com.cs4347.cadence.sensor.StepSensorInbuilt
 
 open class CadenceTrackerService : Service(),
     StepListener {
-    var channelId: String? = null
-    var builder: Notification.Builder? = null
-    var lastStepTime = 0L
-    var lastStepIndex = 0
-    var lastStepDeltas = LongArray(DELTA_TIME_BUFFER_SIZE) { -1 }
-    var stepSensor: StepSensor? = null
+    private var channelId: String? = null
+    private var builder: Notification.Builder? = null
+    private var lastStepTime = 0L
+    private var lastStepIndex = 0
+    private var lastStepDeltas = LongArray(DELTA_TIME_BUFFER_SIZE) { -1 }
+    private var stepSensor: StepSensor? = null
+    protected var deviceName: String = ESENSE_DEVICE_NAME
 
 
     override fun onBind(intent: Intent): IBinder {
@@ -41,6 +42,14 @@ open class CadenceTrackerService : Service(),
         startForeground(1, notification)
         stepSensor?.registerListener(this)
         super.onCreate()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val deviceName = intent?.getStringExtra("DEVICE_NAME")
+        if (deviceName != null) {
+            this.deviceName = deviceName
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onDestroy() {
@@ -61,7 +70,9 @@ open class CadenceTrackerService : Service(),
         if (lastStepDeltas.contains(-1) || channelId == null) {
             return
         }
-
+        sendBroadcast(Intent("com.cadence.stepsChanged").also {
+            it.putExtra("STEPS_PER_MINUTE", getStepsPerMinute())
+        })
         updateNotification()
     }
 

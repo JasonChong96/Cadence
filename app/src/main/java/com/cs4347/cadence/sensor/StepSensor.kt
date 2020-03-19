@@ -1,8 +1,20 @@
 package com.cs4347.cadence.sensor
 
-interface StepSensor {
-    fun registerListener(listener: StepListener)
-    fun unregisterListener(stepListener: StepListener)
+abstract class StepSensor {
+    protected val listeners: MutableList<StepListener> = ArrayList()
 
-    fun stop()
+    fun registerListener(stepListener: StepListener) {
+        listeners.add(stepListener)
+    }
+
+    fun unregisterListener(stepListener: StepListener) {
+        listeners.remove(stepListener)
+    }
+
+    open fun stop() {
+        listeners.forEach {
+            it.sensorStopped()
+        }
+        listeners.clear()
+    }
 }
