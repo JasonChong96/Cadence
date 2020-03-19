@@ -13,6 +13,8 @@
             android:name=".CadenceTrackerService"
             android:enabled="true"
             android:exported="true" />
+        <service android:name=".CadenceTrackerEsenseService" />
+        <service android:name=".CadenceTrackerAccelerometerService" />
 
         <activity android:name=".MainActivity">
             <intent-filter>
