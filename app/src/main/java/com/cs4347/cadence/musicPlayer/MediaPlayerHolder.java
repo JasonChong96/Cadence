@@ -63,7 +63,7 @@ public class MediaPlayerHolder implements PlayerAdapter {
     public void loadMedia(int bpm) {
         initializeMediaPlayer();
 
-        mResourceId = songLibrary.getNextSong(bpm);
+        mResourceId = songLibrary.getNextSong(bpm).getOriginalId();
 
         AssetFileDescriptor assetFileDescriptor = mContext.getResources().openRawResourceFd(mResourceId);
 
