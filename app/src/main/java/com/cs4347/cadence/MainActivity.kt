@@ -14,6 +14,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.bluetoothscanning.BluetoothConfig
 import com.bluetoothscanning.Config
+import com.cs4347.cadence.audio.CadenceAudioPlayerService
 import com.cs4347.cadence.musicPlayer.MediaPlayerHolder
 import com.cs4347.cadence.musicPlayer.PlaybackInfoListener
 import java.util.concurrent.Semaphore
@@ -36,13 +37,16 @@ class MainActivity : AppCompatActivity() {
         button.text = "Stop"
         initializeUI()
         initializePlaybackController()
-        registerReceiver(object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                mPlayerAdapter.updateBpm(
-                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
-                )
-            }
-        }, IntentFilter("com.cadence.stepsChanged"))
+        Intent(this, CadenceAudioPlayerService::class.java).also { intent ->
+            startService(intent)
+        }
+//        registerReceiver(object : BroadcastReceiver() {
+//            override fun onReceive(context: Context?, intent: Intent?) {
+//                mPlayerAdapter.updateBpm(
+//                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
+//                )
+//            }
+//        }, IntentFilter("com.cadence.stepsChanged"))
 
     }
 
@@ -157,19 +161,29 @@ class MainActivity : AppCompatActivity() {
         mTextDebug = findViewById<TextView>(R.id.textView)
 
         val mPlayButton = findViewById<Button>(R.id.play_button)
-        mPlayButton.text = "Play"
+        mPlayButton.text = "120 BPM"
 
         val mClearButton = findViewById<Button>(R.id.clear_button)
         mClearButton.text = "Clear"
 
         val mResetButton = findViewById<Button>(R.id.reset_button)
-        mResetButton.text = "Stop"
+        mResetButton.text = "125 BPM"
 
-        mPlayButton.setOnClickListener { mPlayerAdapter.play() }
+        mPlayButton.setOnClickListener {
+//            mPlayerAdapter.play()
+            sendBroadcast(Intent("com.cadence.stepsChanged").also {
+                it.putExtra("STEPS_PER_MINUTE", 120.0.toDouble())
+            })
+        }
         mClearButton.setOnClickListener {
             mTextDebug.text = ""
         }
-        mResetButton.setOnClickListener { mPlayerAdapter.reset() }
+        mResetButton.setOnClickListener {
+//            mPlayerAdapter.reset()
+            sendBroadcast(Intent("com.cadence.stepsChanged").also {
+                it.putExtra("STEPS_PER_MINUTE", 125.0.toDouble())
+            })
+        }
 
     }
 
@@ -186,9 +200,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onPlaybackCompleted() {
-//            mPlayerAdapter.reset()
-//            mPlayerAdapter.loadMedia(109)
-//            mPlayerAdapter.play()
             onLogUpdated("Playback Completed")
         }
 
@@ -196,9 +207,6 @@ class MainActivity : AppCompatActivity() {
             if (mTextDebug != null) {
                 mTextDebug.append(message)
                 mTextDebug.append("\n")
-                // Moves the scrollContainer focus to the end.
-//                mScrollContainer.post(
-//                    Runnable { mScrollContainer.fullScroll(ScrollView.FOCUS_DOWN) })
             }
         }
     }
