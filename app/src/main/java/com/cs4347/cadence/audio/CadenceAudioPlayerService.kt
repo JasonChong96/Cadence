@@ -313,7 +313,7 @@ class CadenceAudioPlayerService : Service() {
                 }
 
                 val shouldChangeSongSet =
-                    abs(currentlyPlaying.bpm - closestLoadedTrack.bpm) > loadedSongs.getAverageDifference()
+                    abs(bpm - closestLoadedTrack.bpm) > loadedSongs.getAverageDifference()
 
                 if (shouldChangeSongSet) {
                     loadedSongs = loadAndAssignNextSong(bpm)
@@ -321,7 +321,6 @@ class CadenceAudioPlayerService : Service() {
                     this.currentlyPlaying = closestLoadedTrack
                     reset()
                     writeNextBuffer()
-                    audioTrack?.play()
                     return@runAsync
                 }
 
