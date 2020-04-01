@@ -161,18 +161,18 @@ class MainActivity : AppCompatActivity() {
         mTextDebug = findViewById<TextView>(R.id.textView)
 
         val mPlayButton = findViewById<Button>(R.id.play_button)
-        mPlayButton.text = "120 BPM"
+        mPlayButton.text = "130 BPM"
 
         val mClearButton = findViewById<Button>(R.id.clear_button)
         mClearButton.text = "Clear"
 
         val mResetButton = findViewById<Button>(R.id.reset_button)
-        mResetButton.text = "176 BPM"
+        mResetButton.text = "138 BPM"
 
         mPlayButton.setOnClickListener {
 //            mPlayerAdapter.play()
             sendBroadcast(Intent("com.cadence.stepsChanged").also {
-                it.putExtra("STEPS_PER_MINUTE", 120.0)
+                it.putExtra("STEPS_PER_MINUTE", 130.0)
             })
         }
         mClearButton.setOnClickListener {
@@ -181,7 +181,7 @@ class MainActivity : AppCompatActivity() {
         mResetButton.setOnClickListener {
 //            mPlayerAdapter.reset()
             sendBroadcast(Intent("com.cadence.stepsChanged").also {
-                it.putExtra("STEPS_PER_MINUTE", 176.0)
+                it.putExtra("STEPS_PER_MINUTE", 138.0)
             })
         }
 

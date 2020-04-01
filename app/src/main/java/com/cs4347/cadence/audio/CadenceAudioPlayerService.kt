@@ -201,7 +201,7 @@ class CadenceAudioPlayerService : Service() {
                 } else if (res == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     Log.d(TAG, "Format changed on file ${resources.getResourceEntryName(id)}")
                     Log.d(TAG, "Channel count: ${format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)}")
-                    Log.d(TAG, "Sample Rate ${format.getInteger(MediaFormat.KEY_SAMPLE_RATE)}")
+                    Log.d(TAG, "Sample Rate: ${format.getInteger(MediaFormat.KEY_SAMPLE_RATE)}")
                 }
             } else {
                 Log.d(TAG, "Negative input buffer index $inputBufferIndex")
@@ -286,7 +286,7 @@ class CadenceAudioPlayerService : Service() {
         val loadedSongs = arrayOf(songs.slow, songs.original, songs.fast)
 
         return loadedSongs.minBy {
-            abs(it.bpm - bpm)
+            min(abs(it.bpm - bpm), abs(it.bpm - 2 * bpm))
         } ?: throw IllegalArgumentException("No loaded songs.")
     }
 
@@ -313,7 +313,7 @@ class CadenceAudioPlayerService : Service() {
                 }
 
                 val shouldChangeSongSet =
-                    abs(bpm - closestLoadedTrack.bpm) > loadedSongs.getAverageDifference()
+                    min(abs(2 * bpm - closestLoadedTrack.bpm), abs(bpm - closestLoadedTrack.bpm)) > loadedSongs.getAverageDifference()
 
                 if (shouldChangeSongSet) {
                     loadedSongs = loadAndAssignNextSong(bpm)
@@ -329,7 +329,7 @@ class CadenceAudioPlayerService : Service() {
                 }
                 this.currentlyPlaying = closestLoadedTrack
                 curWritingIndex =
-                    round((currentlyPlaying.bpm.toDouble() / closestLoadedTrack.bpm.toDouble()) * curWritingIndex).toInt()
+                    (round((currentlyPlaying.bpm.toDouble() / closestLoadedTrack.bpm.toDouble()) * curWritingIndex).toInt()) / 4 * 4
                 writeNextBuffer()
             } finally {
                 bufferMutex.unlock()
