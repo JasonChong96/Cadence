@@ -14,6 +14,7 @@ import androidx.annotation.RequiresApi
 import com.cs4347.cadence.sensor.StepListener
 import com.cs4347.cadence.sensor.StepSensor
 import com.cs4347.cadence.sensor.StepSensorAccelerometer
+import com.cs4347.cadence.sensor.StepSensorInbuilt
 
 
 open class CadenceTrackerService : Service(),
@@ -57,7 +58,7 @@ open class CadenceTrackerService : Service(),
     }
 
     open fun getStepSensorInstance(): StepSensor {
-        return StepSensorAccelerometer(this)
+        return StepSensorInbuilt(this)
     }
 
     override fun step(timeNs: Long) {

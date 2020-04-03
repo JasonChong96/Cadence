@@ -84,30 +84,7 @@ class CadenceAudioPlayerService : Service() {
                     return
                 }
                 CompletableFuture.runAsync {
-                    bufferMutex.lock()
-                    try {
-                        val currentlyPlaying = this@CadenceAudioPlayerService.currentlyPlaying
-                            ?: throw IllegalStateException("currentlyPlaying is null on callback.")
-                        val bytesRemaining =
-                            currentlyPlaying.samples.size - this@CadenceAudioPlayerService.curWritingIndex
-                        Log.d(
-                            TAG,
-                            "${currentlyPlaying.samples.size} ${this@CadenceAudioPlayerService.curWritingIndex} ${bytesRemaining}"
-                        )
-                        if (bytesRemaining <= 0) {
-                            val newSongSet = loadAndAssignNextSong(currentlyPlaying.bpm)
-                            this@CadenceAudioPlayerService.currentlyPlaying =
-                                getAppropriateLoadedTrack(newSongSet, currentlyPlaying.bpm)
-                            reset()
-                        }
-                        val samplesLeft = lastAudioTrackIndex - track.playbackHeadPosition * 4
-                        if (samplesLeft > BUFFER_SIZE_SECONDS * SAMPLES_PER_SECOND) {
-                            return@runAsync
-                        }
-                        writeNextBuffer()
-                    } finally {
-                        bufferMutex.unlock()
-                    }
+                    onPeriodicPlayback(track)
                 }
             }
         })
@@ -309,7 +286,7 @@ class CadenceAudioPlayerService : Service() {
                 if (currentlyPlaying == null) {
                     this.currentlyPlaying = closestLoadedTrack
                     audioTrack?.play()
-                    writeNextBuffer()
+                    writeNextBuffers()
                     return@runAsync
                 }
 
@@ -328,7 +305,7 @@ class CadenceAudioPlayerService : Service() {
                     closestLoadedTrack = getAppropriateLoadedTrack(loadedSongs, bpm)
                     this.currentlyPlaying = closestLoadedTrack
                     reset()
-                    writeNextBuffer()
+                    writeNextBuffers()
                     return@runAsync
                 }
 
@@ -338,7 +315,7 @@ class CadenceAudioPlayerService : Service() {
                 this.currentlyPlaying = closestLoadedTrack
                 curWritingIndex =
                     (round((currentlyPlaying.bpm.toDouble() / closestLoadedTrack.bpm.toDouble()) * curWritingIndex).toInt()) / 4 * 4
-                writeNextBuffer()
+                writeNextBuffers()
             } finally {
                 bufferMutex.unlock()
             }
@@ -352,27 +329,59 @@ class CadenceAudioPlayerService : Service() {
         audioTrack?.play()
     }
 
-    private fun writeNextBuffer() {
+    private fun writeNextBuffers(numBuffers: Int = 1) {
         val currentlyPlaying = this.currentlyPlaying ?: return
-        val bytesRemaining = currentlyPlaying.samples.size - curWritingIndex
-        if (bytesRemaining <= 0) {
-            return
-        }
+        for (i in 1..numBuffers) {
+            val bytesRemaining = currentlyPlaying.samples.size - curWritingIndex
+            if (bytesRemaining <= 0) {
+                return
+            }
 
-        val sizeWritten = audioTrack?.write(
-            currentlyPlaying.samples,
-            curWritingIndex,
-            min(bytesRemaining, BUFFER_SIZE_SECONDS * SAMPLES_PER_SECOND)
-        )
-        Log.d(TAG, "Written $sizeWritten bytes at ${currentlyPlaying.bpm} BPM")
-        curWritingIndex += BUFFER_SIZE_SECONDS * SAMPLES_PER_SECOND
-        lastAudioTrackIndex += BUFFER_SIZE_SECONDS * SAMPLES_PER_SECOND
+            val sizeWritten = audioTrack?.write(
+                currentlyPlaying.samples,
+                curWritingIndex,
+                min(bytesRemaining, BUFFER_SIZE_BYTES)
+            )
+            Log.d(TAG, "Written $sizeWritten bytes at ${currentlyPlaying.bpm} BPM")
+            curWritingIndex += BUFFER_SIZE_BYTES
+            lastAudioTrackIndex += BUFFER_SIZE_BYTES
+        }
+    }
+
+    private fun onPeriodicPlayback(track: AudioTrack) {
+        bufferMutex.lock()
+        try {
+            val currentlyPlaying = this@CadenceAudioPlayerService.currentlyPlaying
+                ?: throw IllegalStateException("currentlyPlaying is null on callback.")
+            val bytesRemaining =
+                currentlyPlaying.samples.size - this@CadenceAudioPlayerService.curWritingIndex
+            Log.d(
+                TAG,
+                "${currentlyPlaying.samples.size} ${this@CadenceAudioPlayerService.curWritingIndex} ${bytesRemaining}"
+            )
+            if (bytesRemaining <= 0) {
+                val newSongSet = loadAndAssignNextSong(currentlyPlaying.bpm)
+                this@CadenceAudioPlayerService.currentlyPlaying =
+                    getAppropriateLoadedTrack(newSongSet, currentlyPlaying.bpm)
+                reset()
+            }
+            val samplesLeft = lastAudioTrackIndex - track.playbackHeadPosition * 4
+            if (samplesLeft > BUFFER_SIZE_BYTES) {
+                return
+            }
+            writeNextBuffers()
+        } finally {
+            bufferMutex.unlock()
+        }
     }
 
     companion object {
         private const val SAMPLE_RATE = 44100
-        private const val SAMPLES_PER_SECOND = SAMPLE_RATE * 2 * 2
+        private const val NUM_CHANNELS = 2
+        private const val BYTES_PER_SAMPLE = 2
+        private const val BYTES_PER_SECOND = SAMPLE_RATE * BYTES_PER_SAMPLE * NUM_CHANNELS
         private const val BUFFER_SIZE_SECONDS = 2
+        private const val BUFFER_SIZE_BYTES = BUFFER_SIZE_SECONDS * BYTES_PER_SECOND
         private const val MIN_BPM_CHECK_INTERVAL = 1000
         private const val SONG_CHANGE_TRESHOLD_FACTOR = 2
         private const val TAG = "CadenceAudioPlayerService"

@@ -113,7 +113,7 @@ class MainActivity : AppCompatActivity() {
                     .start()
             }
         } else {
-            Intent(this, CadenceTrackerService::class.java).also { intent ->
+            Intent(this, CadenceTrackerAccelerometerService::class.java).also { intent ->
                 startService(intent)
             }
         }
