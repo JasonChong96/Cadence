@@ -70,7 +70,7 @@ class CadenceAudioPlayerService : Service() {
                 }
                 val newBpm = intent.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
                 Log.d(TAG, "Received BPM: $newBpm")
-//                this@CadenceAudioPlayerService.bpmChanged(newBpm)
+                this@CadenceAudioPlayerService.bpmChanged(newBpm)
             }
         }, IntentFilter("com.cadence.stepsChanged"))
         audioTrack.setPlaybackPositionUpdateListener(object :
