@@ -211,16 +211,24 @@ class CadenceAudioPlayerService : Service() {
         return list.toByteArray()
     }
 
-    private fun getNotificationBuilder(): Notification.Builder {
+    private fun getNotificationBuilder(): Notification.Builder? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return null
+        }
+
         val result = builder
         if (result != null) {
             return result
         }
 
-        val newBuilder = Notification.Builder(this, channelId)
-            .setContentText("Started")
-            .setContentTitle("Cadence Audio Player")
-            .setSmallIcon(R.drawable.ic_launcher_background)
+        val newBuilder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, channelId)
+                .setContentText("Started")
+                .setContentTitle("Cadence Audio Player")
+                .setSmallIcon(R.drawable.ic_launcher_background)
+        } else {
+            return null
+        }
         builder = newBuilder
 
         return newBuilder
@@ -237,9 +245,10 @@ class CadenceAudioPlayerService : Service() {
     }
 
     private fun updateNotification(msg: String) {
-        val notification: Notification = getNotificationBuilder()
-            .setContentText(msg)
-            .build()
+        val notification: Notification? = getNotificationBuilder()
+            ?.setContentText(msg)
+            ?.build()
+            ?: return
         val mNotificationManager = getNotificationManager()
         mNotificationManager.notify(1, notification)
     }
@@ -384,6 +393,6 @@ class CadenceAudioPlayerService : Service() {
         private const val BUFFER_SIZE_BYTES = BUFFER_SIZE_SECONDS * BYTES_PER_SECOND
         private const val MIN_BPM_CHECK_INTERVAL = 1000
         private const val SONG_CHANGE_TRESHOLD_FACTOR = 2
-        private const val TAG = "CadenceAudioPlayerService"
+        private const val TAG = "CadenceAudioPlayerSvc"
     }
 }

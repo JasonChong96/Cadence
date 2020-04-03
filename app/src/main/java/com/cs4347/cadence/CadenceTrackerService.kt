@@ -26,6 +26,7 @@ open class CadenceTrackerService : Service(),
     private var lastStepDeltas = LongArray(DELTA_TIME_BUFFER_SIZE) { -1 }
     private var stepSensor: StepSensor? = null
     protected var deviceName: String = ESENSE_DEVICE_NAME
+    private var numSteps = 0
 
 
     override fun onBind(intent: Intent): IBinder {
@@ -36,8 +37,7 @@ open class CadenceTrackerService : Service(),
         stepSensor = getStepSensorInstance()
         channelId = getNewChannelId()
 
-        val notification = getNotificationBuilder()
-            .build()
+        val notification = getNotificationBuilder()?.build()
 
         startForeground(1, notification)
         stepSensor?.registerListener(this)
@@ -92,16 +92,20 @@ open class CadenceTrackerService : Service(),
         return getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
 
-    private fun getNotificationBuilder(): Notification.Builder {
+    private fun getNotificationBuilder(): Notification.Builder? {
         val result = builder
         if (result != null) {
             return result
         }
 
-        val newBuilder = Notification.Builder(this, channelId)
-            .setContentText(getStepsPerMinute().toString())
-            .setContentTitle("Test")
-            .setSmallIcon(R.drawable.ic_launcher_background)
+        val newBuilder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, channelId)
+                .setContentText(getStepsPerMinute().toString())
+                .setContentTitle("Test")
+                .setSmallIcon(R.drawable.ic_launcher_background)
+        } else {
+            return null
+        }
         builder = newBuilder
 
         return newBuilder
@@ -119,8 +123,9 @@ open class CadenceTrackerService : Service(),
 
     private fun updateNotification() {
         val notification: Notification = getNotificationBuilder()
-            .setContentText(getStepsPerMinute().toString())
-            .build()
+            ?.setContentText("Total steps: ${numSteps}, Steps per min: ${getStepsPerMinute()}")
+            ?.build()
+            ?: return
         val mNotificationManager = getNotificationManager()
         mNotificationManager.notify(1, notification)
     }
