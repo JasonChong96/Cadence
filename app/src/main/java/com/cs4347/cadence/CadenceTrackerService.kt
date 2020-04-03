@@ -83,7 +83,8 @@ open class CadenceTrackerService : Service(),
         val median =
             (lastStepDeltas.sortedArray()[(lastStepDeltas.size - 1) / 2].toDouble()
                     + lastStepDeltas.sortedArray()[lastStepDeltas.size / 2].toDouble()) / 2
-        return CadenceTrackerUtils.convertMinToNs(1) / median
+        val mean = lastStepDeltas.average()
+        return CadenceTrackerUtils.convertMinToNs(1) / mean
     }
 
     private fun getNotificationManager(): NotificationManager {

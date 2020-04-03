@@ -14,16 +14,13 @@ import android.media.*
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
-import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.annotation.RequiresApi
-import androidx.core.os.trace
 import com.cs4347.cadence.R
 import com.cs4347.cadence.musicPlayer.SongSelector
 import com.cs4347.cadence.util.PrioLock
 import java.nio.ByteBuffer
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Semaphore
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.round
@@ -71,12 +68,13 @@ class CadenceAudioPlayerService : Service() {
                 if (intent == null) {
                     throw IllegalArgumentException("Intent cannot be null.")
                 }
-                this@CadenceAudioPlayerService
-                    .bpmChanged(intent.getDoubleExtra("STEPS_PER_MINUTE",
-                        1f.toDouble()).roundToInt())
+                val newBpm = intent.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
+                Log.d(TAG, "Received BPM: $newBpm")
+//                this@CadenceAudioPlayerService.bpmChanged(newBpm)
             }
         }, IntentFilter("com.cadence.stepsChanged"))
-        audioTrack.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
+        audioTrack.setPlaybackPositionUpdateListener(object :
+            AudioTrack.OnPlaybackPositionUpdateListener {
             override fun onMarkerReached(track: AudioTrack?) {
                 return
             }
@@ -86,26 +84,30 @@ class CadenceAudioPlayerService : Service() {
                     return
                 }
                 CompletableFuture.runAsync {
-                        bufferMutex.lock()
-                        try {
-                            val currentlyPlaying = this@CadenceAudioPlayerService.currentlyPlaying
-                                ?: throw IllegalStateException("currentlyPlaying is null on callback.")
-                            val bytesRemaining =
-                                currentlyPlaying.samples.size - this@CadenceAudioPlayerService.curWritingIndex
-                            Log.d(TAG, "${currentlyPlaying.samples.size} ${this@CadenceAudioPlayerService.curWritingIndex} ${bytesRemaining}")
-                            if (bytesRemaining <= 0) {
-                                val newSongSet = loadAndAssignNextSong(currentlyPlaying.bpm)
-                                this@CadenceAudioPlayerService.currentlyPlaying = getAppropriateLoadedTrack(newSongSet, currentlyPlaying.bpm)
-                                reset()
-                            }
-                            val samplesLeft = lastAudioTrackIndex - track.playbackHeadPosition * 4
-                            if (samplesLeft > BUFFER_SIZE_SECONDS * SAMPLES_PER_SECOND) {
-                                return@runAsync
-                            }
-                            writeNextBuffer()
-                        } finally {
-                            bufferMutex.unlock()
+                    bufferMutex.lock()
+                    try {
+                        val currentlyPlaying = this@CadenceAudioPlayerService.currentlyPlaying
+                            ?: throw IllegalStateException("currentlyPlaying is null on callback.")
+                        val bytesRemaining =
+                            currentlyPlaying.samples.size - this@CadenceAudioPlayerService.curWritingIndex
+                        Log.d(
+                            TAG,
+                            "${currentlyPlaying.samples.size} ${this@CadenceAudioPlayerService.curWritingIndex} ${bytesRemaining}"
+                        )
+                        if (bytesRemaining <= 0) {
+                            val newSongSet = loadAndAssignNextSong(currentlyPlaying.bpm)
+                            this@CadenceAudioPlayerService.currentlyPlaying =
+                                getAppropriateLoadedTrack(newSongSet, currentlyPlaying.bpm)
+                            reset()
                         }
+                        val samplesLeft = lastAudioTrackIndex - track.playbackHeadPosition * 4
+                        if (samplesLeft > BUFFER_SIZE_SECONDS * SAMPLES_PER_SECOND) {
+                            return@runAsync
+                        }
+                        writeNextBuffer()
+                    } finally {
+                        bufferMutex.unlock()
+                    }
                 }
             }
         })
@@ -305,7 +307,6 @@ class CadenceAudioPlayerService : Service() {
                 var closestLoadedTrack = getAppropriateLoadedTrack(loadedSongs, bpm)
 
                 if (currentlyPlaying == null) {
-//                    reset()
                     this.currentlyPlaying = closestLoadedTrack
                     audioTrack?.play()
                     writeNextBuffer()
@@ -313,7 +314,14 @@ class CadenceAudioPlayerService : Service() {
                 }
 
                 val shouldChangeSongSet =
-                    min(abs(2 * bpm - closestLoadedTrack.bpm), abs(bpm - closestLoadedTrack.bpm)) > loadedSongs.getAverageDifference()
+                    min(
+                        abs(2 * bpm - closestLoadedTrack.bpm),
+                        abs(bpm - closestLoadedTrack.bpm)
+                    ) > loadedSongs.getAverageDifference() * SONG_CHANGE_TRESHOLD_FACTOR
+                Log.d(
+                    TAG,
+                    "New BPM: $bpm, shouldChangeSongSet: $shouldChangeSongSet, closestBpm: ${closestLoadedTrack.bpm}"
+                )
 
                 if (shouldChangeSongSet) {
                     loadedSongs = loadAndAssignNextSong(bpm)
@@ -366,6 +374,7 @@ class CadenceAudioPlayerService : Service() {
         private const val SAMPLES_PER_SECOND = SAMPLE_RATE * 2 * 2
         private const val BUFFER_SIZE_SECONDS = 2
         private const val MIN_BPM_CHECK_INTERVAL = 1000
+        private const val SONG_CHANGE_TRESHOLD_FACTOR = 2
         private const val TAG = "CadenceAudioPlayerService"
     }
 }
