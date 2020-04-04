@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.TreeMap;
 
 public class SongSelector {
-    private TreeMap<Integer, ArrayList<Integer>> songLibrary;
+    private TreeMap<Integer, ArrayList<TimeShiftedSong>> songLibrary;
 
     private int currentBpm;
     private int currentTrackNo;
@@ -22,7 +22,7 @@ public class SongSelector {
         populateLibrary();
     }
 
-    public int getNextSong(int bpm) {
+    public TimeShiftedSong getNextSong(int bpm) {
         if (currentBpm == bpm) { //No change in BPM, play next song
             currentTrackNo++;
             if (currentTrackNo >= songLibrary.get(currentBpm).size()) {
@@ -89,28 +89,45 @@ public class SongSelector {
 
     private void populateLibrary() {
         Field[] fields = R.raw.class.getFields();
-        for (int i = 0; i < fields.length - 1; i++) {
-            String name = fields[i].getName();
-            String[] details = name.split("_");
-            if (details.length == 1) {
-                continue;
-            }
-            int bpm = Integer.parseInt(details[details.length - 1]);
-            @RawRes int resourceId = 0;
-            try {
-                resourceId = (Integer) fields[i].get(null);
-            } catch (Exception e) {
+        int i = 0;
+        while (i < fields.length) {
+            @RawRes int slowId = getIdFromField(fields[i]);
+            int slowBpm = getBpmFromField(fields[i]);
+            i++;
 
-            }
+            @RawRes int originalId = getIdFromField(fields[i]);
+            int originalBpm = getBpmFromField(fields[i]);
+            i++;
 
-            if (songLibrary.containsKey(bpm)) {
-                songLibrary.get(bpm).add(resourceId);
+            @RawRes int fastId = getIdFromField(fields[i]);
+            int fastBpm = getBpmFromField(fields[i]);
+            i++;
+
+            TimeShiftedSong currentSong = new TimeShiftedSong(slowId, slowBpm, originalId, originalBpm, fastId, fastBpm);
+            if (songLibrary.containsKey(originalBpm)) {
+                songLibrary.get(originalBpm).add(currentSong);
             } else {
-                ArrayList<Integer> songList = new ArrayList<Integer>();
-                songList.add(resourceId);
-                songLibrary.put(bpm, songList);
+                ArrayList<TimeShiftedSong> songList = new ArrayList<TimeShiftedSong>();
+                songList.add(currentSong);
+                songLibrary.put(originalBpm, songList);
             }
         }
+    }
+
+    private int getBpmFromField(Field field) {
+        String name = field.getName();
+        String[] details = name.split("_");
+        return Integer.parseInt(details[details.length - 1]);
+    }
+
+    private int getIdFromField(Field field) {
+        @RawRes int resourceId = 0;
+        try {
+            resourceId = (Integer) field.get(null);
+        } catch (Exception e) {
+
+        }
+        return resourceId;
     }
 
     public int getCurrentTrackNo() {

@@ -1,8 +1,10 @@
 package com.cs4347.cadence.sensor
 
 import android.content.Context
+import android.os.SystemClock.sleep
 import io.esense.esenselib.ESenseConfig
 import io.esense.esenselib.ESenseConnectionListener
+import io.esense.esenselib.ESenseEventListener
 import io.esense.esenselib.ESenseManager
 
 class StepSensorEsense(context: Context, deviceName: String) : StepSensor() {
@@ -31,45 +33,45 @@ class StepSensorEsense(context: Context, deviceName: String) : StepSensor() {
                     return
                 }
 
-//                manager.registerEventListener(object : ESenseEventListener {
-//                    override fun onBatteryRead(voltage: Double) {
-//                        return
-//                    }
-//
-//                    override fun onDeviceNameRead(deviceName: String?) {
-//                        return
-//                    }
-//
-//                    override fun onAdvertisementAndConnectionIntervalRead(
-//                        minAdvertisementInterval: Int,
-//                        maxAdvertisementInterval: Int,
-//                        minConnectionInterval: Int,
-//                        maxConnectionInterval: Int
-//                    ) {
-//                        return
-//                    }
-//
-//                    override fun onButtonEventChanged(pressed: Boolean) {
-//                        return
-//                    }
-//
-//                    override fun onSensorConfigRead(config: ESenseConfig?) {
-//                        println(config)
-//                        this@StepSensorEsense.esenseConfig = config
-//                    }
-//
-//                    override fun onAccelerometerOffsetRead(
-//                        offsetX: Int,
-//                        offsetY: Int,
-//                        offsetZ: Int
-//                    ) {
-//                        return
-//                    }
-//                })
-//                while (!manager.sensorConfig) {
-//                    println("Failed to get config")
-//                    sleep(3000L)
-//                }
+                manager.registerEventListener(object : ESenseEventListener {
+                    override fun onBatteryRead(voltage: Double) {
+                        return
+                    }
+
+                    override fun onDeviceNameRead(deviceName: String?) {
+                        return
+                    }
+
+                    override fun onAdvertisementAndConnectionIntervalRead(
+                        minAdvertisementInterval: Int,
+                        maxAdvertisementInterval: Int,
+                        minConnectionInterval: Int,
+                        maxConnectionInterval: Int
+                    ) {
+                        return
+                    }
+
+                    override fun onButtonEventChanged(pressed: Boolean) {
+                        return
+                    }
+
+                    override fun onSensorConfigRead(config: ESenseConfig?) {
+                        println(config)
+                        this@StepSensorEsense.esenseConfig = config
+                    }
+
+                    override fun onAccelerometerOffsetRead(
+                        offsetX: Int,
+                        offsetY: Int,
+                        offsetZ: Int
+                    ) {
+                        return
+                    }
+                })
+                while (!manager.sensorConfig) {
+                    println("Failed to get config")
+                    sleep(3000L)
+                }
 //                sleep(3000L)
                 val status = manager.registerSensorListener({
                     this@StepSensorEsense.esenseConfig = ESenseConfig()
