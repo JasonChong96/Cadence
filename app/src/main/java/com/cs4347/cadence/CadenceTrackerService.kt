@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.os.Binder
 import android.os.Build
@@ -13,7 +15,6 @@ import android.os.IBinder
 import androidx.annotation.RequiresApi
 import com.cs4347.cadence.sensor.StepListener
 import com.cs4347.cadence.sensor.StepSensor
-import com.cs4347.cadence.sensor.StepSensorAccelerometer
 import com.cs4347.cadence.sensor.StepSensorInbuilt
 
 
@@ -41,8 +42,19 @@ open class CadenceTrackerService : Service(),
         if (notification != null) {
             startForeground(1, notification)
         }
+        registerBroadcastReceivers()
         stepSensor?.registerListener(this)
         super.onCreate()
+    }
+
+    private fun registerBroadcastReceivers() {
+        registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                sendBroadcast(Intent(ACTION_SEND_STEPS_PER_MINUTE).also {
+                    it.putExtra("STEPS_PER_MINUTE", getStepsPerMinute())
+                })
+            }
+        }, IntentFilter(ACTION_GET_STEPS_PER_MINUTE))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -72,7 +84,7 @@ open class CadenceTrackerService : Service(),
         if (lastStepDeltas.contains(-1) || channelId == null) {
             return
         }
-        sendBroadcast(Intent("com.cadence.stepsChanged").also {
+        sendBroadcast(Intent(ACTION_UPDATE_STEPS_PER_MINUTE).also {
             it.putExtra("STEPS_PER_MINUTE", getStepsPerMinute())
         })
         updateNotification()

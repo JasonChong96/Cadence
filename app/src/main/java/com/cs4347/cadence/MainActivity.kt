@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 //                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
 //                )
 //            }
-//        }, IntentFilter("com.cadence.stepsChanged"))
+//        }, IntentFilter(ACTION_UPDATE_STEPS_PER_MINUTE))
 
     }
 
@@ -205,7 +205,7 @@ class MainActivity : AppCompatActivity() {
 
         mPlayButton.setOnClickListener {
 //            mPlayerAdapter.play()
-            sendBroadcast(Intent("com.cadence.stepsChanged").also {
+            sendBroadcast(Intent(ACTION_UPDATE_STEPS_PER_MINUTE).also {
                 it.putExtra("STEPS_PER_MINUTE", 130.0)
             })
         }
@@ -214,7 +214,7 @@ class MainActivity : AppCompatActivity() {
         }
         mResetButton.setOnClickListener {
 //            mPlayerAdapter.reset()
-            sendBroadcast(Intent("com.cadence.stepsChanged").also {
+            sendBroadcast(Intent(ACTION_UPDATE_STEPS_PER_MINUTE).also {
                 it.putExtra("STEPS_PER_MINUTE", 138.0)
             })
         }

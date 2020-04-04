@@ -1,5 +1,6 @@
 package com.cs4347.cadence.audio
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,11 +17,15 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.cs4347.cadence.ACTION_REQUEST_AUDIO_STATE
+import com.cs4347.cadence.ACTION_UPDATE_AUDIO_STATE
+import com.cs4347.cadence.ACTION_UPDATE_STEPS_PER_MINUTE
 import com.cs4347.cadence.R
 import com.cs4347.cadence.musicPlayer.SongSelector
 import com.cs4347.cadence.util.PrioLock
 import java.nio.ByteBuffer
 import java.util.concurrent.CompletableFuture
+import kotlin.collections.ArrayList
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.round
@@ -44,6 +49,13 @@ class CadenceAudioPlayerService : Service() {
     }
 
     override fun onCreate() {
+        initializeAudioTrack()
+        registerBroadcastReceivers()
+
+        super.onCreate()
+    }
+
+    private fun initializeAudioTrack() {
         channelId = getNewChannelId()
         val audioTrack = AudioTrack.Builder()
             .setAudioAttributes(
@@ -63,16 +75,6 @@ class CadenceAudioPlayerService : Service() {
             .setBufferSizeInBytes(SAMPLE_RATE)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
-        registerReceiver(object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent == null) {
-                    throw IllegalArgumentException("Intent cannot be null.")
-                }
-                val newBpm = intent.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
-                Log.d(TAG, "Received BPM: $newBpm")
-                this@CadenceAudioPlayerService.bpmChanged(newBpm)
-            }
-        }, IntentFilter("com.cadence.stepsChanged"))
         audioTrack.setPlaybackPositionUpdateListener(object :
             AudioTrack.OnPlaybackPositionUpdateListener {
             override fun onMarkerReached(track: AudioTrack?) {
@@ -90,10 +92,27 @@ class CadenceAudioPlayerService : Service() {
         })
         audioTrack.positionNotificationPeriod = round(SAMPLE_RATE * 1.9).toInt()
         this.audioTrack = audioTrack
+    }
 
-//        loadAndAssignNextSong(120)
-
-        super.onCreate()
+    private fun registerBroadcastReceivers() {
+        registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent == null) {
+                    throw IllegalArgumentException("Intent cannot be null.")
+                }
+                val newBpm = intent.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
+                Log.d(TAG, "Received BPM: $newBpm")
+                this@CadenceAudioPlayerService.bpmChanged(newBpm)
+            }
+        }, IntentFilter(ACTION_UPDATE_STEPS_PER_MINUTE))
+        registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent == null) {
+                    throw IllegalArgumentException("Intent cannot be null.")
+                }
+                this@CadenceAudioPlayerService.broadcastState()
+            }
+        }, IntentFilter(ACTION_REQUEST_AUDIO_STATE))
     }
 
     private fun loadAndAssignNextSong(bpm: Int): LoadedTimeShiftedSong {
@@ -106,9 +125,8 @@ class CadenceAudioPlayerService : Service() {
             arrayOf(nextSongInfo.slowBpm, nextSongInfo.originalBpm, nextSongInfo.fastBpm)
 
         val loadedSongs = resourceIds
-            .map(this::loadSongById)
-            .mapIndexed { i: Int, bytes: ByteArray ->
-                LoadedSong(resourceBpm[i], bytes)
+            .mapIndexed { i: Int, id: Int ->
+                loadSongById(id, resourceBpm[i])
             }
 
         val result = LoadedTimeShiftedSong(loadedSongs[0], loadedSongs[1], loadedSongs[2])
@@ -118,7 +136,7 @@ class CadenceAudioPlayerService : Service() {
         return result
     }
 
-    private fun loadSongById(id: Int): ByteArray {
+    private fun loadSongById(id: Int, bpm: Int): LoadedSong {
         val assetFileDescriptor: AssetFileDescriptor =
             resources.openRawResourceFd(id)
 
@@ -208,7 +226,7 @@ class CadenceAudioPlayerService : Service() {
         }
         codec.stop()
         assetFileDescriptor.close()
-        return list.toByteArray()
+        return LoadedSong(getSongName(id), bpm, list.toByteArray())
     }
 
     private fun getNotificationBuilder(): Notification.Builder? {
@@ -310,11 +328,13 @@ class CadenceAudioPlayerService : Service() {
                 )
 
                 if (shouldChangeSongSet) {
+                    writeNextBuffers(numBuffers = 5)
                     loadedSongs = loadAndAssignNextSong(bpm)
                     closestLoadedTrack = getAppropriateLoadedTrack(loadedSongs, bpm)
                     this.currentlyPlaying = closestLoadedTrack
                     reset()
                     writeNextBuffers()
+                    broadcastState()
                     return@runAsync
                 }
 
@@ -325,6 +345,7 @@ class CadenceAudioPlayerService : Service() {
                 curWritingIndex =
                     (round((currentlyPlaying.bpm.toDouble() / closestLoadedTrack.bpm.toDouble()) * curWritingIndex).toInt()) / 4 * 4
                 writeNextBuffers()
+                broadcastState()
             } finally {
                 bufferMutex.unlock()
             }
@@ -372,6 +393,7 @@ class CadenceAudioPlayerService : Service() {
                 val newSongSet = loadAndAssignNextSong(currentlyPlaying.bpm)
                 this@CadenceAudioPlayerService.currentlyPlaying =
                     getAppropriateLoadedTrack(newSongSet, currentlyPlaying.bpm)
+                broadcastState()
                 reset()
             }
             val samplesLeft = lastAudioTrackIndex - track.playbackHeadPosition * 4
@@ -384,15 +406,25 @@ class CadenceAudioPlayerService : Service() {
         }
     }
 
+    private fun broadcastState() {
+        sendBroadcast(Intent(ACTION_UPDATE_AUDIO_STATE).also {
+            it.putExtra("CURRENT_TRACK_NAME", currentlyPlaying?.name)
+            it.putExtra("CURRENT_TRACK_BPM", currentlyPlaying?.bpm)
+            it.putExtra("AUDIO_SESSION_ID", audioTrack?.audioSessionId)
+        })
+    }
+
+    @SuppressLint("DefaultLocale")
+    private fun getSongName(id: Int): String {
+        return resources.getResourceEntryName(id)
+            .split(".")[0]
+            .split("_")
+            .dropLast(1).joinToString(separator = " ") {
+                it.capitalize()
+            }
+    }
+
     companion object {
-        private const val SAMPLE_RATE = 44100
-        private const val NUM_CHANNELS = 2
-        private const val BYTES_PER_SAMPLE = 2
-        private const val BYTES_PER_SECOND = SAMPLE_RATE * BYTES_PER_SAMPLE * NUM_CHANNELS
-        private const val BUFFER_SIZE_SECONDS = 2
-        private const val BUFFER_SIZE_BYTES = BUFFER_SIZE_SECONDS * BYTES_PER_SECOND
-        private const val MIN_BPM_CHECK_INTERVAL = 1000
-        private const val SONG_CHANGE_TRESHOLD_FACTOR = 2
         private const val TAG = "CadenceAudioPlayerSvc"
     }
 }

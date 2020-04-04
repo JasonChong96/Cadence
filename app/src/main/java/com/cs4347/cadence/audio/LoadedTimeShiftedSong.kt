@@ -8,4 +8,4 @@ data class LoadedTimeShiftedSong(val slow: LoadedSong, val original: LoadedSong,
     }
 }
 
-data class LoadedSong(val bpm: Int, val samples: ByteArray)
+data class LoadedSong(val name: String, val bpm: Int, val samples: ByteArray)
