@@ -27,6 +27,7 @@ class StepSensorInbuilt(context: Context) : SensorEventListener,
     }
 
     override fun onSensorChanged(event: SensorEvent) {
+        println("STEPPED")
         if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
             listeners.forEach {
                 it.step(event.timestamp)

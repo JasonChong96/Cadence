@@ -38,8 +38,9 @@ open class CadenceTrackerService : Service(),
         channelId = getNewChannelId()
 
         val notification = getNotificationBuilder()?.build()
-
-        startForeground(1, notification)
+        if (notification != null) {
+            startForeground(1, notification)
+        }
         stepSensor?.registerListener(this)
         super.onCreate()
     }
@@ -62,6 +63,7 @@ open class CadenceTrackerService : Service(),
     }
 
     override fun step(timeNs: Long) {
+        this.numSteps++
         val delta = timeNs - lastStepTime
         lastStepDeltas[lastStepIndex] = if (lastStepTime == 0L) 0 else delta
         this.lastStepTime = timeNs
