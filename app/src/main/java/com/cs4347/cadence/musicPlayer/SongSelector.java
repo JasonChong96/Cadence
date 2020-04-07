@@ -31,19 +31,13 @@ public class SongSelector {
     }
 
     public TimeShiftedSong getNextSong(int bpm) {
-        if (!isChangingBpm(bpm)) { //No change in BPM, play next song
-            currentTrackNo++;
-            if (currentTrackNo >= songLibrary.get(currentBpm).size()) {
-                currentTrackNo = 0;
-            }
-            return songLibrary.get(currentBpm).get(currentTrackNo);
-        }
-        if(!isSwitchingSong(bpm)) { // Some change in the bpm, using the same song, but change the bpm
-            // V2: Change in BPM, change the BPM for the song
+        if(!isSwitchingSong(bpm) || !isChangingBpm(bpm)) {
+            // Not changing the bpm, just go to the next song
             currentTrackNo = (currentTrackNo + 1) % songLibrary.get(currentBpm).size();
             return songLibrary.get(currentBpm).get(currentTrackNo);
         }
 
+        // Change the bpm and find the correct song
         if (songLibrary.containsKey(bpm)) { //Change in BPM, BPM is found, play first song
             currentBpm = bpm;
             currentTrackNo = 0;

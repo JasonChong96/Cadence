@@ -41,13 +41,6 @@ class MainActivity : AppCompatActivity() {
         Intent(this, CadenceAudioPlayerService::class.java).also { intent ->
             startService(intent)
         }
-//        registerReceiver(object : BroadcastReceiver() {
-//            override fun onReceive(context: Context?, intent: Intent?) {
-//                mPlayerAdapter.updateBpm(
-//                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
-//                )
-//            }
-//        }, IntentFilter(ACTION_UPDATE_STEPS_PER_MINUTE))
 
     }
 
