@@ -15,19 +15,32 @@ public class SongSelector {
     private int currentBpm;
     private int currentTrackNo;
 
+    private int bpmChangeThreshold = 10;
+    private int bpmChangeRange = 5;
+    // [-2 * bpmChangeThreshold, -bpmChangeThreshold, 0, bpmChangeThreshold, 2 * bpmChangeThreshold]
+    private ArrayList<Integer> bpmList;
+
     public SongSelector() {
         songLibrary = new TreeMap<>();
         currentBpm = 0;
         currentTrackNo = 0;
         populateLibrary();
+        for(int i = 0; i < bpmChangeRange; i++) {
+            bpmList.add((i - bpmChangeRange/2)*bpmChangeThreshold);
+        }
     }
 
     public int getNextSong(int bpm) {
-        if (currentBpm == bpm) { //No change in BPM, play next song
+        if(!isChangingBpm(bpm)) { // Limited Change in bpm within the range, we don't change the song bpm
             currentTrackNo++;
             if (currentTrackNo >= songLibrary.get(currentBpm).size()) {
                 currentTrackNo = 0;
             }
+            return songLibrary.get(currentBpm).get(currentTrackNo);
+        }
+        if(!isSwitchingSong(bpm)) { // Some change in the bpm, using the same song, but change the bpm
+            // V2: Change in BPM, change the BPM for the song
+            currentTrackNo = (currentTrackNo + 1) % songLibrary.get(currentBpm).size();
             return songLibrary.get(currentBpm).get(currentTrackNo);
         }
 
@@ -38,7 +51,6 @@ public class SongSelector {
         }
 
         // Change in BPM, exact BPM not found in library. Find closest and play first song
-
         currentBpm = getBestFitBpm(bpm);
         currentTrackNo = 0;
         return songLibrary.get(currentBpm).get(currentTrackNo);
@@ -121,7 +133,15 @@ public class SongSelector {
         this.currentTrackNo = currentTrackNo;
     }
 
-    public boolean isShouldChangeBpm(int newBpm) {
-        return getBestFitBpm(newBpm) != currentBpm;
+    public boolean isSwitchingSong(int newBpm) {
+        return newBpm - currentBpm < bpmChangeThreshold*bpmChangeRange/2 &&
+                currentBpm - newBpm < bpmChangeThreshold*bpmChangeRange/2;
+    }
+
+    public boolean isChangingBpm(int newBpm) {
+        //return getBestFitBpm(newBpm) != currentBpm;
+        // The absolute difference for the current and new bpm is within the threshold.
+        return newBpm - currentBpm < bpmChangeThreshold/2 &&
+                currentBpm - newBpm < bpmChangeThreshold/2;
     }
 }

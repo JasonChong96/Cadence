@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
@@ -48,6 +49,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+
+        // TODO: Enable back stage playing
+
         if (IS_USING_ESENSE) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -164,6 +168,9 @@ class MainActivity : AppCompatActivity() {
 
         val mResetButton = findViewById<Button>(R.id.reset_button)
         mResetButton.text = "Stop"
+
+        val mBPMDisplayText = findViewById<TextView>(R.id.bpmTextView);
+        mBPMDisplayText.text = "Finding your bpm..."
 
         mPlayButton.setOnClickListener { mPlayerAdapter.play() }
         mClearButton.setOnClickListener {

@@ -11,6 +11,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import be.tarsos.dsp.AudioDispatcher;
+import be.tarsos.dsp.WaveformSimilarityBasedOverlapAdd;
+import be.tarsos.dsp.WaveformSimilarityBasedOverlapAdd.Parameters;
+
 public class MediaPlayerHolder implements PlayerAdapter {
 
     private static final int PLAYBACK_POSITION_REFRESH_INTERVAL_MS = 1000;
@@ -205,9 +209,16 @@ public class MediaPlayerHolder implements PlayerAdapter {
 
     synchronized public void updateBpm(int newBpm) {
         logToUI(String.format(Locale.ENGLISH, "BGM Updated %d. Should change bpm: %b. Time from last: %d",
-                newBpm, songLibrary.isShouldChangeBpm(newBpm), System.currentTimeMillis() - lastLoadTime));
-        if (System.currentTimeMillis() - lastLoadTime < SONG_CHANGE_INTERVAL || !songLibrary.isShouldChangeBpm(newBpm)) {
-            return;
+                newBpm, songLibrary.isChangingBpm(newBpm), System.currentTimeMillis() - lastLoadTime));
+        if (System.currentTimeMillis() - lastLoadTime < SONG_CHANGE_INTERVAL || !songLibrary.isChangingBpm(newBpm)) {
+            return; // The time difference is too small or the bpm change is with in minimum range
+        }
+        if (!songLibrary.isSwitchingSong(newBpm)) {
+            // Just change the bpm of the current song, don't change the song
+            int duration = 1000;
+            int startingFrame = (int)(mMediaPlayer.getCurrentPosition() /
+                    (float)mMediaPlayer.getDuration() * duration);
+
         }
         boolean isAutoStart = mMediaPlayer.isPlaying();
         lastLoadTime = System.currentTimeMillis();

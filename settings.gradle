@@ -1,2 +1,3 @@
 rootProject.name='Cadence'
 include ':app'
+include ':app:libs'
