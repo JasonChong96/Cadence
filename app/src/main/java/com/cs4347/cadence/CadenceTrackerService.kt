@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.os.Binder
 import android.os.Build
@@ -13,7 +15,6 @@ import android.os.IBinder
 import androidx.annotation.RequiresApi
 import com.cs4347.cadence.sensor.StepListener
 import com.cs4347.cadence.sensor.StepSensor
-import com.cs4347.cadence.sensor.StepSensorAccelerometer
 import com.cs4347.cadence.sensor.StepSensorInbuilt
 
 
@@ -26,6 +27,7 @@ open class CadenceTrackerService : Service(),
     private var lastStepDeltas = LongArray(DELTA_TIME_BUFFER_SIZE) { -1 }
     private var stepSensor: StepSensor? = null
     protected var deviceName: String = ESENSE_DEVICE_NAME
+    private var numSteps = 0
 
 
     override fun onBind(intent: Intent): IBinder {
@@ -36,12 +38,23 @@ open class CadenceTrackerService : Service(),
         stepSensor = getStepSensorInstance()
         channelId = getNewChannelId()
 
-        val notification = getNotificationBuilder()
-            .build()
-
-        startForeground(1, notification)
+        val notification = getNotificationBuilder()?.build()
+        if (notification != null) {
+            startForeground(1, notification)
+        }
+        registerBroadcastReceivers()
         stepSensor?.registerListener(this)
         super.onCreate()
+    }
+
+    private fun registerBroadcastReceivers() {
+        registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                sendBroadcast(Intent(ACTION_SEND_STEPS_PER_MINUTE).also {
+                    it.putExtra("STEPS_PER_MINUTE", getStepsPerMinute())
+                })
+            }
+        }, IntentFilter(ACTION_GET_STEPS_PER_MINUTE))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -58,10 +71,11 @@ open class CadenceTrackerService : Service(),
     }
 
     open fun getStepSensorInstance(): StepSensor {
-        return StepSensorAccelerometer(this)
+        return StepSensorInbuilt(this)
     }
 
     override fun step(timeNs: Long) {
+        this.numSteps++
         val delta = timeNs - lastStepTime
         lastStepDeltas[lastStepIndex] = if (lastStepTime == 0L) 0 else delta
         this.lastStepTime = timeNs
@@ -70,7 +84,7 @@ open class CadenceTrackerService : Service(),
         if (lastStepDeltas.contains(-1) || channelId == null) {
             return
         }
-        sendBroadcast(Intent("com.cadence.stepsChanged").also {
+        sendBroadcast(Intent(ACTION_UPDATE_STEPS_PER_MINUTE).also {
             it.putExtra("STEPS_PER_MINUTE", getStepsPerMinute())
         })
         updateNotification()
@@ -81,23 +95,31 @@ open class CadenceTrackerService : Service(),
     }
 
     private fun getStepsPerMinute(): Double {
-        return CadenceTrackerUtils.convertMinToNs(1) / lastStepDeltas.average()
+        val median =
+            (lastStepDeltas.sortedArray()[(lastStepDeltas.size - 1) / 2].toDouble()
+                    + lastStepDeltas.sortedArray()[lastStepDeltas.size / 2].toDouble()) / 2
+        val mean = lastStepDeltas.average()
+        return CadenceTrackerUtils.convertMinToNs(1) / mean
     }
 
     private fun getNotificationManager(): NotificationManager {
         return getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
 
-    private fun getNotificationBuilder(): Notification.Builder {
+    private fun getNotificationBuilder(): Notification.Builder? {
         val result = builder
         if (result != null) {
             return result
         }
 
-        val newBuilder = Notification.Builder(this, channelId)
-            .setContentText(getStepsPerMinute().toString())
-            .setContentTitle("Test")
-            .setSmallIcon(R.drawable.ic_launcher_background)
+        val newBuilder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, channelId)
+                .setContentText(getStepsPerMinute().toString())
+                .setContentTitle("Test")
+                .setSmallIcon(R.drawable.ic_launcher_background)
+        } else {
+            return null
+        }
         builder = newBuilder
 
         return newBuilder
@@ -115,8 +137,9 @@ open class CadenceTrackerService : Service(),
 
     private fun updateNotification() {
         val notification: Notification = getNotificationBuilder()
-            .setContentText(getStepsPerMinute().toString())
-            .build()
+            ?.setContentText("Total steps: ${numSteps}, Steps per min: ${getStepsPerMinute()}")
+            ?.build()
+            ?: return
         val mNotificationManager = getNotificationManager()
         mNotificationManager.notify(1, notification)
     }

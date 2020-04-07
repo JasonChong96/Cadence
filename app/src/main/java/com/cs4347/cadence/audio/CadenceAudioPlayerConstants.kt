@@ -1,0 +1,12 @@
+@file:JvmName("CadenceAudioPlayerCOnstants")
+
+package com.cs4347.cadence.audio
+
+const val SAMPLE_RATE = 44100
+const val NUM_CHANNELS = 2
+const val BYTES_PER_SAMPLE = 2
+const val BYTES_PER_SECOND = SAMPLE_RATE * BYTES_PER_SAMPLE * NUM_CHANNELS
+const val BUFFER_SIZE_SECONDS = 2
+const val BUFFER_SIZE_BYTES = BUFFER_SIZE_SECONDS * BYTES_PER_SECOND
+const val MIN_BPM_CHECK_INTERVAL = 1000
+const val SONG_CHANGE_TRESHOLD_FACTOR = 2

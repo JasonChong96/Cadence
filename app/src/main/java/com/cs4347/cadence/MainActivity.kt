@@ -15,6 +15,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.bluetoothscanning.BluetoothConfig
 import com.bluetoothscanning.Config
+import com.cs4347.cadence.audio.CadenceAudioPlayerService
 import com.cs4347.cadence.musicPlayer.MediaPlayerHolder
 import com.cs4347.cadence.musicPlayer.PlaybackInfoListener
 import java.util.concurrent.Semaphore
@@ -37,13 +38,16 @@ class MainActivity : AppCompatActivity() {
         button.text = "Stop"
         initializeUI()
         initializePlaybackController()
-        registerReceiver(object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                mPlayerAdapter.updateBpm(
-                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
-                )
-            }
-        }, IntentFilter("com.cadence.stepsChanged"))
+        Intent(this, CadenceAudioPlayerService::class.java).also { intent ->
+            startService(intent)
+        }
+//        registerReceiver(object : BroadcastReceiver() {
+//            override fun onReceive(context: Context?, intent: Intent?) {
+//                mPlayerAdapter.updateBpm(
+//                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
+//                )
+//            }
+//        }, IntentFilter(ACTION_UPDATE_STEPS_PER_MINUTE))
 
     }
 
@@ -54,51 +58,7 @@ class MainActivity : AppCompatActivity() {
 
         if (IS_USING_ESENSE) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
-                    == PackageManager.PERMISSION_GRANTED
-                ) {
-                    if (checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                        != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-                            val builder = AlertDialog.Builder(this)
-                            builder.setTitle("This app needs background location access")
-                            builder.setMessage("Please grant location access so this app can detect beacons in the background.")
-                            builder.setPositiveButton(android.R.string.ok, null)
-                            builder.setOnDismissListener(DialogInterface.OnDismissListener {
-                                requestPermissions(
-                                    arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
-                                    PERMISSION_REQUEST_BACKGROUND_LOCATION
-                                )
-                            })
-                            builder.show()
-                        } else {
-                            val builder = AlertDialog.Builder(this)
-                            builder.setTitle("Functionality limited")
-                            builder.setMessage("Since background location access has not been granted, this app will not be able to discover beacons in the background.  Please go to Settings -> Applications -> Permissions and grant background location access to this app.")
-                            builder.setPositiveButton(android.R.string.ok, null)
-                            builder.setOnDismissListener(DialogInterface.OnDismissListener { })
-                            builder.show()
-                        }
-                    }
-                } else {
-                    if (!shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                        requestPermissions(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                            ),
-                            PERMISSION_REQUEST_FINE_LOCATION
-                        )
-                    } else {
-                        val builder = AlertDialog.Builder(this)
-                        builder.setTitle("Functionality limited")
-                        builder.setMessage("Since location access has not been granted, this app will not be able to discover beacons.  Please go to Settings -> Applications -> Permissions and grant location access to this app.")
-                        builder.setPositiveButton(android.R.string.ok, null)
-                        builder.setOnDismissListener(DialogInterface.OnDismissListener { })
-                        builder.show()
-                    }
-                }
+                checkAndRequestBluetooth()
             }
             val deviceName = intent.getStringExtra("DEVICE_NAME")
             if (deviceName != null) {
@@ -113,11 +73,89 @@ class MainActivity : AppCompatActivity() {
                     .start()
             }
         } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                checkAndRequestActivityRecognition()
+            }
             Intent(this, CadenceTrackerService::class.java).also { intent ->
                 startService(intent)
             }
         }
         mPlayerAdapter.loadMedia(120)
+    }
+
+    private fun checkAndRequestBluetooth() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            if (checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+                    val builder = AlertDialog.Builder(this)
+                    builder.setTitle("This app needs background location access")
+                    builder.setMessage("Please grant location access so this app can detect beacons in the background.")
+                    builder.setPositiveButton(android.R.string.ok, null)
+                    builder.setOnDismissListener(DialogInterface.OnDismissListener {
+                        requestPermissions(
+                            arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                            PERMISSION_REQUEST_BACKGROUND_LOCATION
+                        )
+                    })
+                    builder.show()
+                } else {
+                    val builder = AlertDialog.Builder(this)
+                    builder.setTitle("Functionality limited")
+                    builder.setMessage("Since background location access has not been granted, this app will not be able to discover beacons in the background.  Please go to Settings -> Applications -> Permissions and grant background location access to this app.")
+                    builder.setPositiveButton(android.R.string.ok, null)
+                    builder.setOnDismissListener(DialogInterface.OnDismissListener { })
+                    builder.show()
+                }
+            }
+        } else {
+            if (!shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                requestPermissions(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                    ),
+                    PERMISSION_REQUEST_FINE_LOCATION
+                )
+            } else {
+                val builder = AlertDialog.Builder(this)
+                builder.setTitle("Functionality limited")
+                builder.setMessage("Since location access has not been granted, this app will not be able to discover beacons.  Please go to Settings -> Applications -> Permissions and grant location access to this app.")
+                builder.setPositiveButton(android.R.string.ok, null)
+                builder.setOnDismissListener(DialogInterface.OnDismissListener { })
+                builder.show()
+            }
+        }
+    }
+
+    private fun checkAndRequestActivityRecognition() {
+        if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            if (shouldShowRequestPermissionRationale(Manifest.permission.ACTIVITY_RECOGNITION)) {
+                val builder = AlertDialog.Builder(this)
+                builder.setTitle("This app needs activity recognition access")
+                builder.setMessage("Please grant activity recognition so this app can detect your pace.")
+                builder.setPositiveButton(android.R.string.ok, null)
+                builder.setOnDismissListener(DialogInterface.OnDismissListener {
+                    requestPermissions(
+                        arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
+                        PERMISSION_REQUEST_ACTIVITY_RECOGNITION
+                    )
+                })
+                builder.show()
+            } else {
+                val builder = AlertDialog.Builder(this)
+                builder.setTitle("Functionality limited")
+                builder.setMessage("Since Activity Recognition access has not been granted, this app will not be able to recognize your steps.")
+                builder.setPositiveButton(android.R.string.ok, null)
+                builder.setOnDismissListener(DialogInterface.OnDismissListener { })
+                builder.show()
+            }
+        }
     }
 
     override fun onStop() {
@@ -161,22 +199,29 @@ class MainActivity : AppCompatActivity() {
         mTextDebug = findViewById<TextView>(R.id.textView)
 
         val mPlayButton = findViewById<Button>(R.id.play_button)
-        mPlayButton.text = "Play"
+        mPlayButton.text = "130 BPM"
 
         val mClearButton = findViewById<Button>(R.id.clear_button)
         mClearButton.text = "Clear"
 
         val mResetButton = findViewById<Button>(R.id.reset_button)
-        mResetButton.text = "Stop"
+        mResetButton.text = "138 BPM"
 
-        val mBPMDisplayText = findViewById<TextView>(R.id.bpmTextView);
-        mBPMDisplayText.text = "Finding your bpm..."
-
-        mPlayButton.setOnClickListener { mPlayerAdapter.play() }
+        mPlayButton.setOnClickListener {
+//            mPlayerAdapter.play()
+            sendBroadcast(Intent(ACTION_UPDATE_STEPS_PER_MINUTE).also {
+                it.putExtra("STEPS_PER_MINUTE", 130.0)
+            })
+        }
         mClearButton.setOnClickListener {
             mTextDebug.text = ""
         }
-        mResetButton.setOnClickListener { mPlayerAdapter.reset() }
+        mResetButton.setOnClickListener {
+//            mPlayerAdapter.reset()
+            sendBroadcast(Intent(ACTION_UPDATE_STEPS_PER_MINUTE).also {
+                it.putExtra("STEPS_PER_MINUTE", 138.0)
+            })
+        }
 
     }
 
@@ -193,9 +238,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onPlaybackCompleted() {
-//            mPlayerAdapter.reset()
-//            mPlayerAdapter.loadMedia(109)
-//            mPlayerAdapter.play()
             onLogUpdated("Playback Completed")
         }
 
@@ -203,9 +245,6 @@ class MainActivity : AppCompatActivity() {
             if (mTextDebug != null) {
                 mTextDebug.append(message)
                 mTextDebug.append("\n")
-                // Moves the scrollContainer focus to the end.
-//                mScrollContainer.post(
-//                    Runnable { mScrollContainer.fullScroll(ScrollView.FOCUS_DOWN) })
             }
         }
     }
@@ -213,6 +252,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private val PERMISSION_REQUEST_FINE_LOCATION = 1
         private val PERMISSION_REQUEST_BACKGROUND_LOCATION = 2
+        private val PERMISSION_REQUEST_ACTIVITY_RECOGNITION = 2
     }
 }
 
