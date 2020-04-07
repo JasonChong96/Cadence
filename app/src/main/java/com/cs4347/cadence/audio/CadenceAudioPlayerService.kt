@@ -18,7 +18,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.cs4347.cadence.ACTION_REQUEST_AUDIO_STATE
-import com.cs4347.cadence.ACTION_UPDATE_AUDIO_STATE
+import com.cs4347.cadence.ACTION_AUDIO_STATE_UPDATED
 import com.cs4347.cadence.ACTION_UPDATE_STEPS_PER_MINUTE
 import com.cs4347.cadence.R
 import com.cs4347.cadence.musicPlayer.SongSelector
@@ -51,6 +51,7 @@ class CadenceAudioPlayerService : Service() {
     override fun onCreate() {
         initializeAudioTrack()
         registerBroadcastReceivers()
+        broadcastState()
 
         super.onCreate()
     }
@@ -407,7 +408,7 @@ class CadenceAudioPlayerService : Service() {
     }
 
     private fun broadcastState() {
-        sendBroadcast(Intent(ACTION_UPDATE_AUDIO_STATE).also {
+        sendBroadcast(Intent(ACTION_AUDIO_STATE_UPDATED).also {
             it.putExtra("CURRENT_TRACK_NAME", currentlyPlaying?.name)
             it.putExtra("CURRENT_TRACK_BPM", currentlyPlaying?.bpm)
             it.putExtra("AUDIO_SESSION_ID", audioTrack?.audioSessionId)

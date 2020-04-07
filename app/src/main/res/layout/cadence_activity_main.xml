@@ -6,6 +6,27 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        app:strokeColor="@color/strokeColor"
+        app:strokeWidth="0.1dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <com.gauravk.audiovisualizer.visualizer.CircleLineVisualizer
+            android:id="@+id/visualiser"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:avColor="@color/av_dark_blue"
+            app:avDensity="0.8"
+            app:avSpeed="normal"
+            app:avType="fill" />
+    </com.google.android.material.card.MaterialCardView>
+
     <TextView
         android:id="@+id/textView"
         android:layout_width="wrap_content"

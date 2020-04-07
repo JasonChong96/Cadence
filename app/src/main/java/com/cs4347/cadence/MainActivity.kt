@@ -17,8 +17,9 @@ import com.bluetoothscanning.Config
 import com.cs4347.cadence.audio.CadenceAudioPlayerService
 import com.cs4347.cadence.musicPlayer.MediaPlayerHolder
 import com.cs4347.cadence.musicPlayer.PlaybackInfoListener
+import com.gauravk.audiovisualizer.visualizer.CircleLineVisualizer
+import java.lang.RuntimeException
 import java.util.concurrent.Semaphore
-import kotlin.math.roundToInt
 
 
 class MainActivity : AppCompatActivity() {
@@ -27,9 +28,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mPlayerAdapter: MediaPlayerHolder
     lateinit var mTextDebug: TextView
+    lateinit var mVisualizerView: CircleLineVisualizer
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
         setContentView(R.layout.cadence_activity_main)
         val button = findViewById<Button>(R.id.button2)
@@ -52,6 +53,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        checkAndRequestAudioRecord()
         if (IS_USING_ESENSE) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 checkAndRequestBluetooth()
@@ -76,6 +78,9 @@ class MainActivity : AppCompatActivity() {
                 startService(intent)
             }
         }
+        registerReceivers()
+        sendBroadcast(Intent(ACTION_GET_STEPS_PER_MINUTE))
+        sendBroadcast(Intent(ACTION_REQUEST_AUDIO_STATE))
         mPlayerAdapter.loadMedia(120)
     }
 
@@ -154,6 +159,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkAndRequestAudioRecord() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
+                val builder = AlertDialog.Builder(this)
+                builder.setTitle("This app needs record audio access.")
+                builder.setMessage("Please grant access so that the visualizer works.")
+                builder.setPositiveButton(android.R.string.ok, null)
+                builder.setOnDismissListener(DialogInterface.OnDismissListener {
+                    requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), PERMISSION_REQUEST_RECORD_AUDIO)
+                })
+                builder.show()
+            } else {
+                val builder = AlertDialog.Builder(this)
+                builder.setTitle("Functionality limited")
+                builder.setMessage("Since Audio Record access has not been granted, this app will not be able to recognize your steps.")
+                builder.setPositiveButton(android.R.string.ok, null)
+                builder.setOnDismissListener(DialogInterface.OnDismissListener { })
+                builder.show()
+            }
+        }
+    }
+
     override fun onStop() {
         super.onStop()
         if (isChangingConfigurations && mPlayerAdapter.isPlaying) {
@@ -219,6 +248,8 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
+        mVisualizerView = findViewById(R.id.visualiser)
+
     }
 
     private fun initializePlaybackController() {
@@ -245,10 +276,57 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun registerReceivers() {
+        registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent == null) {
+                    throw IllegalArgumentException("Intent cannot be null.")
+                }
+                val stepsPerMinute = intent.getDoubleExtra("STEPS_PER_MINUTE", -1.0)
+
+                if (stepsPerMinute < 0) {
+                    return
+                }
+
+                // TODO: UPDATE UI
+            }
+        }, IntentFilter(ACTION_UPDATE_STEPS_PER_MINUTE).also {
+            it.addAction(ACTION_SEND_STEPS_PER_MINUTE)
+        })
+
+        registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent == null) {
+                    throw IllegalArgumentException("Intent cannot be null.")
+                }
+                val trackBpm = intent.getIntExtra("CURRENT_TRACK_BPM", -1)
+                val trackName = intent.getStringExtra("CURRENT_TRACK_NAME")
+                val audioSessionId = intent.getIntExtra("AUDIO_SESSION_ID", -1)
+
+                if (audioSessionId < 0) {
+                    return
+                }
+
+                try {
+                    mVisualizerView.setAudioSessionId(audioSessionId)
+                } catch (re: RuntimeException) {
+                    // No permissions
+                }
+
+                if (trackBpm < 0 || trackName == null) {
+                    return
+                }
+
+                // TODO: UPDATE UI
+            }
+        }, IntentFilter(ACTION_AUDIO_STATE_UPDATED))
+    }
+
     companion object {
         private val PERMISSION_REQUEST_FINE_LOCATION = 1
         private val PERMISSION_REQUEST_BACKGROUND_LOCATION = 2
-        private val PERMISSION_REQUEST_ACTIVITY_RECOGNITION = 2
+        private val PERMISSION_REQUEST_ACTIVITY_RECOGNITION = 3
+        private val PERMISSION_REQUEST_RECORD_AUDIO = 4
     }
 }
 
