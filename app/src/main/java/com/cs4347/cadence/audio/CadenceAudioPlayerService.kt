@@ -17,10 +17,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.cs4347.cadence.ACTION_REQUEST_AUDIO_STATE
-import com.cs4347.cadence.ACTION_AUDIO_STATE_UPDATED
-import com.cs4347.cadence.ACTION_UPDATE_STEPS_PER_MINUTE
-import com.cs4347.cadence.R
+import com.cs4347.cadence.*
 import com.cs4347.cadence.musicPlayer.SongSelector
 import com.cs4347.cadence.util.PrioLock
 import java.nio.ByteBuffer
@@ -30,6 +27,7 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.round
 import kotlin.math.roundToInt
+import kotlin.properties.Delegates
 
 
 class CadenceAudioPlayerService : Service() {
@@ -37,27 +35,45 @@ class CadenceAudioPlayerService : Service() {
     private var channelId: String? = null
     private var audioTrack: AudioTrack? = null
     private val songLibrary = SongSelector()
-    private var currentSong: LoadedTimeShiftedSong? = null
+    private var currentSong by Delegates.observable<LoadedTimeShiftedSong?>(null) { _, _, _ ->
+        broadcastState()
+    }
     private var lastAudioTrackIndex = 0
     private var curWritingIndex = 0
-    private var currentlyPlaying: LoadedSong? = null
+    private var currentlyPlaying by Delegates.observable<LoadedSong?>(null) { _, _, _ ->
+        broadcastState()
+    }
     private var bufferMutex = PrioLock()
     private var lastBpmChangeTime: Long = 0
+    private var lastSongChangeTime: Long = 0
+    private var isLoading: Boolean by Delegates.observable(false) { _, _, _ ->
+        broadcastState()
+    }
+    private var broadcastReceivers: MutableList<BroadcastReceiver> = ArrayList()
 
     override fun onBind(intent: Intent): IBinder {
         return Binder()
     }
 
     override fun onCreate() {
+        channelId = getNewChannelId()
         initializeAudioTrack()
         registerBroadcastReceivers()
         broadcastState()
+        val notificationBuilder = getNotificationBuilder()
+        if (notificationBuilder != null) {
+            startForeground(2, notificationBuilder.build())
+        }
 
         super.onCreate()
     }
 
+    override fun onDestroy() {
+        broadcastReceivers.forEach(this::unregisterReceiver)
+        super.onDestroy()
+    }
+
     private fun initializeAudioTrack() {
-        channelId = getNewChannelId()
         val audioTrack = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -91,12 +107,12 @@ class CadenceAudioPlayerService : Service() {
                 }
             }
         })
-        audioTrack.positionNotificationPeriod = round(SAMPLE_RATE * 1.9).toInt()
+        audioTrack.positionNotificationPeriod = round(SAMPLE_RATE * BUFFER_SIZE_SECONDS * 0.9).toInt()
         this.audioTrack = audioTrack
     }
 
     private fun registerBroadcastReceivers() {
-        registerReceiver(object : BroadcastReceiver() {
+        val stepsReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent == null) {
                     throw IllegalArgumentException("Intent cannot be null.")
@@ -105,19 +121,66 @@ class CadenceAudioPlayerService : Service() {
                 Log.d(TAG, "Received BPM: $newBpm")
                 this@CadenceAudioPlayerService.bpmChanged(newBpm)
             }
-        }, IntentFilter(ACTION_UPDATE_STEPS_PER_MINUTE))
-        registerReceiver(object : BroadcastReceiver() {
+        }
+        broadcastReceivers.add(stepsReceiver)
+        registerReceiver(stepsReceiver, IntentFilter(ACTION_UPDATE_STEPS_PER_MINUTE))
+
+        val stateRequestReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent == null) {
-                    throw IllegalArgumentException("Intent cannot be null.")
-                }
                 this@CadenceAudioPlayerService.broadcastState()
             }
-        }, IntentFilter(ACTION_REQUEST_AUDIO_STATE))
+        }
+        registerReceiver(stateRequestReceiver, IntentFilter(ACTION_REQUEST_AUDIO_STATE))
+        broadcastReceivers.add(stateRequestReceiver)
+
+        val playRequestReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (isLoading) {
+                    return
+                }
+                CompletableFuture.runAsync {
+                    bufferMutex.lockPriority()
+                    try {
+                        this@CadenceAudioPlayerService.audioTrack?.flush()
+                        this@CadenceAudioPlayerService.lastAudioTrackIndex = 0
+                        this@CadenceAudioPlayerService.audioTrack?.stop()
+                        initializeAudioTrack()
+                        this@CadenceAudioPlayerService.audioTrack?.play()
+                        broadcastState()
+
+                        writeNextBuffers(2)
+                    } finally {
+                        bufferMutex.unlock()
+                    }
+                }
+            }
+        }
+        broadcastReceivers.add(playRequestReceiver)
+        registerReceiver(playRequestReceiver, IntentFilter(ACTION_PLAY_AUDIO))
+
+        val pauseRequestReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (isLoading) {
+                    return
+                }
+                CompletableFuture.runAsync {
+                    bufferMutex.lockPriority()
+                    try {
+                        this@CadenceAudioPlayerService.audioTrack?.pause()
+                        broadcastState()
+                    } finally {
+                        bufferMutex.unlock()
+                    }
+                }
+            }
+        }
+        broadcastReceivers.add(pauseRequestReceiver)
+        registerReceiver(pauseRequestReceiver, IntentFilter(ACTION_PAUSE_AUDIO))
     }
 
     private fun loadAndAssignNextSong(bpm: Int): LoadedTimeShiftedSong {
-        updateNotification("Loading Song")
+        this.lastSongChangeTime = System.currentTimeMillis()
+        this.isLoading = true
         this.currentlyPlaying = null
         this.currentSong = null
         val nextSongInfo = songLibrary.getNextSong(bpm)
@@ -133,7 +196,7 @@ class CadenceAudioPlayerService : Service() {
         val result = LoadedTimeShiftedSong(loadedSongs[0], loadedSongs[1], loadedSongs[2])
         this.currentSong = result
 
-        updateNotification("Songs Loaded")
+        this.isLoading = false
         return result
     }
 
@@ -242,9 +305,9 @@ class CadenceAudioPlayerService : Service() {
 
         val newBuilder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, channelId)
-                .setContentText("Started")
-                .setContentTitle("Cadence Audio Player")
-                .setSmallIcon(R.drawable.ic_launcher_background)
+                .setContentText("You may close this through the Cadence Application")
+                .setContentTitle("Cadence Audio Player is running.")
+                .setSmallIcon(R.drawable.ic_audiotrack_black_24dp)
         } else {
             return null
         }
@@ -299,7 +362,7 @@ class CadenceAudioPlayerService : Service() {
 
     @Synchronized
     private fun bpmChanged(bpm: Int) {
-        if (System.currentTimeMillis() - lastBpmChangeTime < MIN_BPM_CHECK_INTERVAL) {
+        if (isLoading || System.currentTimeMillis() - lastBpmChangeTime < MIN_BPM_CHECK_INTERVAL) {
             return
         }
         lastBpmChangeTime = System.currentTimeMillis()
@@ -322,20 +385,20 @@ class CadenceAudioPlayerService : Service() {
                     min(
                         abs(2 * bpm - closestLoadedTrack.bpm),
                         abs(bpm - closestLoadedTrack.bpm)
-                    ) > loadedSongs.getAverageDifference() * SONG_CHANGE_TRESHOLD_FACTOR
+                    ) > loadedSongs.getAverageDifference() * SONG_CHANGE_TRESHOLD_FACTOR && System.currentTimeMillis() - lastSongChangeTime > MIN_INTERVAL_BETWEEN_SONG_CHANGE
                 Log.d(
                     TAG,
                     "New BPM: $bpm, shouldChangeSongSet: $shouldChangeSongSet, closestBpm: ${closestLoadedTrack.bpm}"
                 )
 
                 if (shouldChangeSongSet) {
-                    writeNextBuffers(numBuffers = 5)
+                    writeNextBuffers(numBuffers = 8)
                     loadedSongs = loadAndAssignNextSong(bpm)
                     closestLoadedTrack = getAppropriateLoadedTrack(loadedSongs, bpm)
                     this.currentlyPlaying = closestLoadedTrack
                     reset()
                     writeNextBuffers()
-                    broadcastState()
+//                    broadcastState()
                     return@runAsync
                 }
 
@@ -346,7 +409,7 @@ class CadenceAudioPlayerService : Service() {
                 curWritingIndex =
                     (round((currentlyPlaying.bpm.toDouble() / closestLoadedTrack.bpm.toDouble()) * curWritingIndex).toInt()) / 4 * 4
                 writeNextBuffers()
-                broadcastState()
+//                broadcastState()
             } finally {
                 bufferMutex.unlock()
             }
@@ -394,7 +457,7 @@ class CadenceAudioPlayerService : Service() {
                 val newSongSet = loadAndAssignNextSong(currentlyPlaying.bpm)
                 this@CadenceAudioPlayerService.currentlyPlaying =
                     getAppropriateLoadedTrack(newSongSet, currentlyPlaying.bpm)
-                broadcastState()
+//                broadcastState()
                 reset()
             }
             val samplesLeft = lastAudioTrackIndex - track.playbackHeadPosition * 4
@@ -412,6 +475,8 @@ class CadenceAudioPlayerService : Service() {
             it.putExtra("CURRENT_TRACK_NAME", currentlyPlaying?.name)
             it.putExtra("CURRENT_TRACK_BPM", currentlyPlaying?.bpm)
             it.putExtra("AUDIO_SESSION_ID", audioTrack?.audioSessionId)
+            it.putExtra("IS_PAUSED", audioTrack?.playState == AudioTrack.PLAYSTATE_PAUSED)
+            it.putExtra("IS_LOADING", isLoading)
         })
     }
 

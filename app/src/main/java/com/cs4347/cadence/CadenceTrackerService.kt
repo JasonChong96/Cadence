@@ -28,6 +28,7 @@ open class CadenceTrackerService : Service(),
     private var stepSensor: StepSensor? = null
     protected var deviceName: String = ESENSE_DEVICE_NAME
     private var numSteps = 0
+    private var broadcastReceiver: BroadcastReceiver? = null
 
 
     override fun onBind(intent: Intent): IBinder {
@@ -48,13 +49,16 @@ open class CadenceTrackerService : Service(),
     }
 
     private fun registerBroadcastReceivers() {
-        registerReceiver(object : BroadcastReceiver() {
+        val requestReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 sendBroadcast(Intent(ACTION_SEND_STEPS_PER_MINUTE).also {
                     it.putExtra("STEPS_PER_MINUTE", getStepsPerMinute())
+                    it.putExtra("TOTAL_STEPS_TAKEN", getNumSteps())
                 })
             }
-        }, IntentFilter(ACTION_GET_STEPS_PER_MINUTE))
+        }
+        broadcastReceiver = requestReceiver
+        registerReceiver(requestReceiver, IntentFilter(ACTION_GET_STEPS_PER_MINUTE))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -67,6 +71,9 @@ open class CadenceTrackerService : Service(),
 
     override fun onDestroy() {
         stepSensor?.stop()
+        if (broadcastReceiver != null) {
+            unregisterReceiver(broadcastReceiver)
+        }
         super.onDestroy()
     }
 
@@ -86,8 +93,8 @@ open class CadenceTrackerService : Service(),
         }
         sendBroadcast(Intent(ACTION_UPDATE_STEPS_PER_MINUTE).also {
             it.putExtra("STEPS_PER_MINUTE", getStepsPerMinute())
+            it.putExtra("TOTAL_STEPS_TAKEN", getNumSteps())
         })
-        updateNotification()
     }
 
     override fun sensorStopped() {
@@ -114,9 +121,9 @@ open class CadenceTrackerService : Service(),
 
         val newBuilder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, channelId)
-                .setContentText(getStepsPerMinute().toString())
-                .setContentTitle("Test")
-                .setSmallIcon(R.drawable.ic_launcher_background)
+                .setContentText("You may close this through the Cadence Application")
+                .setContentTitle("Cadence Step Tracker is running.")
+                .setSmallIcon(R.drawable.ic_directions_run_black_24dp)
         } else {
             return null
         }
@@ -135,13 +142,8 @@ open class CadenceTrackerService : Service(),
         }
     }
 
-    private fun updateNotification() {
-        val notification: Notification = getNotificationBuilder()
-            ?.setContentText("Total steps: ${numSteps}, Steps per min: ${getStepsPerMinute()}")
-            ?.build()
-            ?: return
-        val mNotificationManager = getNotificationManager()
-        mNotificationManager.notify(1, notification)
+    private fun getNumSteps(): Int {
+        return numSteps
     }
 
     @RequiresApi(Build.VERSION_CODES.O)

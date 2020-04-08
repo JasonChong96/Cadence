@@ -1,4 +1,14 @@
 <resources>
     <string name="app_name">Cadence</string>
     <string name="button">Button</string>
+    <string name="cadenceAppCaption">Audio specially tailored to your pace</string>
+    <string name="closeButtonLabel">Close</string>
+    <string name="totalStepsTakenLabel">Total Steps Taken</string>
+    <string name="initialStepsPerMinute">0</string>
+    <string name="stepsPerMinuteLabel">Steps Per Minute</string>
+    <string name="cadenceAppName">Cadence</string>
+    <string name="runningStatsBackgroundContentDesc">Running stats background</string>
+    <string name="initialStepsTaken">0</string>
+    <string name="visualizerMiddleImageContentDesc">Man jogging</string>
+    <string name="waitingForStepsText">Waiting for sufficient steps to be detected...</string>
 </resources>
