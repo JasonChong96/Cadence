@@ -142,8 +142,8 @@ class CadenceAudioPlayerService : Service() {
                     bufferMutex.lockPriority()
                     try {
                         this@CadenceAudioPlayerService.audioTrack?.flush()
-                        this@CadenceAudioPlayerService.lastAudioTrackIndex = 0
                         this@CadenceAudioPlayerService.audioTrack?.stop()
+                        this@CadenceAudioPlayerService.lastAudioTrackIndex = 0
                         initializeAudioTrack()
                         this@CadenceAudioPlayerService.audioTrack?.play()
                         broadcastState()
