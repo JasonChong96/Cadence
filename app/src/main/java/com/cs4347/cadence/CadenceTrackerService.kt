@@ -25,6 +25,7 @@ open class CadenceTrackerService : Service(),
     private var lastStepTime = 0L
     private var lastStepIndex = 0
     private var lastStepDeltas = LongArray(DELTA_TIME_BUFFER_SIZE) { -1 }
+    private var lastStepDelta = -1L
     private var stepSensor: StepSensor? = null
     protected var deviceName: String = ESENSE_DEVICE_NAME
     private var numSteps = 0
@@ -83,9 +84,15 @@ open class CadenceTrackerService : Service(),
 
     override fun step(timeNs: Long) {
         this.numSteps++
-        val delta = timeNs - lastStepTime
-        lastStepDeltas[lastStepIndex] = if (lastStepTime == 0L) 0 else delta
+        val delta = if (lastStepTime != 0L) (timeNs - lastStepTime) else 0
+        val prevDelta = lastStepDelta
+        val factorChange = delta.toDouble() / prevDelta.toDouble()
+        lastStepDelta = delta
         this.lastStepTime = timeNs
+        if (prevDelta > 0 && delta != 0.toLong() && (factorChange > 2 || factorChange < 0.5)) {
+            return
+        }
+        lastStepDeltas[lastStepIndex] = delta
         lastStepIndex = (lastStepIndex + 1) % lastStepDeltas.size
 
         if (lastStepDeltas.contains(-1) || channelId == null) {
@@ -107,10 +114,6 @@ open class CadenceTrackerService : Service(),
                     + lastStepDeltas.sortedArray()[lastStepDeltas.size / 2].toDouble()) / 2
         val mean = lastStepDeltas.average()
         return CadenceTrackerUtils.convertMinToNs(1) / mean
-    }
-
-    private fun getNotificationManager(): NotificationManager {
-        return getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
 
     private fun getNotificationBuilder(): Notification.Builder? {

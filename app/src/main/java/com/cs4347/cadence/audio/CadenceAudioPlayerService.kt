@@ -22,7 +22,6 @@ import com.cs4347.cadence.musicPlayer.SongSelector
 import com.cs4347.cadence.util.PrioLock
 import java.nio.ByteBuffer
 import java.util.concurrent.CompletableFuture
-import kotlin.collections.ArrayList
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.round
@@ -107,7 +106,8 @@ class CadenceAudioPlayerService : Service() {
                 }
             }
         })
-        audioTrack.positionNotificationPeriod = round(SAMPLE_RATE * BUFFER_SIZE_SECONDS * 0.9).toInt()
+        audioTrack.positionNotificationPeriod =
+            round(SAMPLE_RATE * BUFFER_SIZE_SECONDS * 0.9).toInt()
         this.audioTrack = audioTrack
     }
 
@@ -179,9 +179,7 @@ class CadenceAudioPlayerService : Service() {
     }
 
     private fun loadAndAssignNextSong(bpm: Int): LoadedTimeShiftedSong {
-        this.lastSongChangeTime = System.currentTimeMillis()
         this.isLoading = true
-        this.currentlyPlaying = null
         this.currentSong = null
         val nextSongInfo = songLibrary.getNextSong(bpm)
         val resourceIds = arrayOf(nextSongInfo.slowId, nextSongInfo.originalId, nextSongInfo.fastId)
@@ -197,6 +195,7 @@ class CadenceAudioPlayerService : Service() {
         this.currentSong = result
 
         this.isLoading = false
+        this.lastSongChangeTime = System.currentTimeMillis()
         return result
     }
 
@@ -326,15 +325,6 @@ class CadenceAudioPlayerService : Service() {
         }
     }
 
-    private fun updateNotification(msg: String) {
-        val notification: Notification? = getNotificationBuilder()
-            ?.setContentText(msg)
-            ?.build()
-            ?: return
-        val mNotificationManager = getNotificationManager()
-        mNotificationManager.notify(1, notification)
-    }
-
     @RequiresApi(Build.VERSION_CODES.O)
     private fun createNotificationChannel(channelId: String, channelName: String): String {
         val chan = NotificationChannel(
@@ -346,10 +336,6 @@ class CadenceAudioPlayerService : Service() {
         val service = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         service.createNotificationChannel(chan)
         return channelId
-    }
-
-    private fun getNotificationManager(): NotificationManager {
-        return getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
 
     private fun getAppropriateLoadedTrack(songs: LoadedTimeShiftedSong, bpm: Int): LoadedSong {
@@ -385,20 +371,20 @@ class CadenceAudioPlayerService : Service() {
                     min(
                         abs(2 * bpm - closestLoadedTrack.bpm),
                         abs(bpm - closestLoadedTrack.bpm)
-                    ) > loadedSongs.getAverageDifference() * SONG_CHANGE_TRESHOLD_FACTOR && System.currentTimeMillis() - lastSongChangeTime > MIN_INTERVAL_BETWEEN_SONG_CHANGE
+                    ) > loadedSongs.getAverageDifference() * SONG_CHANGE_TRESHOLD_FACTOR &&
+                            System.currentTimeMillis() - lastSongChangeTime > MIN_INTERVAL_BETWEEN_SONG_CHANGE &&
+                            songLibrary.getBestFitBpm(bpm) != loadedSongs.original.bpm
                 Log.d(
                     TAG,
                     "New BPM: $bpm, shouldChangeSongSet: $shouldChangeSongSet, closestBpm: ${closestLoadedTrack.bpm}"
                 )
 
                 if (shouldChangeSongSet) {
-                    writeNextBuffers(numBuffers = 8)
                     loadedSongs = loadAndAssignNextSong(bpm)
                     closestLoadedTrack = getAppropriateLoadedTrack(loadedSongs, bpm)
                     this.currentlyPlaying = closestLoadedTrack
                     reset()
                     writeNextBuffers()
-//                    broadcastState()
                     return@runAsync
                 }
 
@@ -409,7 +395,6 @@ class CadenceAudioPlayerService : Service() {
                 curWritingIndex =
                     (round((currentlyPlaying.bpm.toDouble() / closestLoadedTrack.bpm.toDouble()) * curWritingIndex).toInt()) / 4 * 4
                 writeNextBuffers()
-//                broadcastState()
             } finally {
                 bufferMutex.unlock()
             }
@@ -457,7 +442,6 @@ class CadenceAudioPlayerService : Service() {
                 val newSongSet = loadAndAssignNextSong(currentlyPlaying.bpm)
                 this@CadenceAudioPlayerService.currentlyPlaying =
                     getAppropriateLoadedTrack(newSongSet, currentlyPlaying.bpm)
-//                broadcastState()
                 reset()
             }
             val samplesLeft = lastAudioTrackIndex - track.playbackHeadPosition * 4
