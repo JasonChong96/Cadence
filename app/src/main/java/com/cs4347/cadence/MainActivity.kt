@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.speech.tts.Voice
 import android.view.View
 import android.widget.Button
-import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.bluetoothscanning.BluetoothConfig
@@ -20,42 +19,28 @@ import com.cs4347.cadence.musicPlayer.MediaPlayerHolder
 import com.cs4347.cadence.musicPlayer.PlaybackInfoListener
 import com.cs4347.cadence.voice.SpeechHandler
 import com.cs4347.cadence.voice.VoiceCommandAdapter
+import com.gauravk.audiovisualizer.model.AnimSpeed
+import kotlinx.android.synthetic.main.cadence_activity_main.*
 import java.util.concurrent.Semaphore
 
 
 class MainActivity : AppCompatActivity() {
     private var isStarted = false
-    private var toggleSemaphore = Semaphore(1)
-
-    private lateinit var mPlayerAdapter: MediaPlayerHolder
-    private lateinit var mVoiceRecognizer: VoiceCommandAdapter
-    lateinit var mTextDebug: TextView
+    private val broadcastReceivers: MutableList<BroadcastReceiver> = ArrayList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
         setContentView(R.layout.cadence_activity_main)
-        val button = findViewById<Button>(R.id.button2)
+        visualiserView.setAnimationSpeed(AnimSpeed.FAST)
         isStarted = true
-        button.text = "Stop"
-        initializeUI()
-        initializePlaybackController()
-        initializeVoice()
         Intent(this, CadenceAudioPlayerService::class.java).also { intent ->
             startService(intent)
         }
-//        registerReceiver(object : BroadcastReceiver() {
-//            override fun onReceive(context: Context?, intent: Intent?) {
-//                mPlayerAdapter.updateBpm(
-//                    intent!!.getDoubleExtra("STEPS_PER_MINUTE", 1f.toDouble()).roundToInt()
-//                )
-//            }
-//        }, IntentFilter(ACTION_UPDATE_STEPS_PER_MINUTE))
-
     }
 
     override fun onStart() {
         super.onStart()
+        checkAndRequestAudioRecord()
         if (IS_USING_ESENSE) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 checkAndRequestBluetooth()
@@ -80,7 +65,14 @@ class MainActivity : AppCompatActivity() {
                 startService(intent)
             }
         }
-        mPlayerAdapter.loadMedia(120)
+        registerReceivers()
+        sendBroadcast(Intent(ACTION_GET_STEPS_PER_MINUTE))
+        sendBroadcast(Intent(ACTION_REQUEST_AUDIO_STATE))
+    }
+
+    override fun onDestroy() {
+        broadcastReceivers.forEach(this::unregisterReceiver)
+        super.onDestroy()
     }
 
     private fun checkAndRequestBluetooth() {
@@ -158,106 +150,134 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onStop() {
-        super.onStop()
-        if (isChangingConfigurations && mPlayerAdapter.isPlaying) {
-            return
+    private fun checkAndRequestAudioRecord() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
+                val builder = AlertDialog.Builder(this)
+                builder.setTitle("This app needs record audio access.")
+                builder.setMessage("Please grant access so that the visualizer works.")
+                builder.setPositiveButton(android.R.string.ok, null)
+                builder.setOnDismissListener(DialogInterface.OnDismissListener {
+                    requestPermissions(
+                        arrayOf(Manifest.permission.RECORD_AUDIO),
+                        PERMISSION_REQUEST_RECORD_AUDIO
+                    )
+                })
+                builder.show()
+            } else {
+                val builder = AlertDialog.Builder(this)
+                builder.setTitle("Functionality limited")
+                builder.setMessage("Since Audio Record access has not been granted, this app will not be able to recognize your steps.")
+                builder.setPositiveButton(android.R.string.ok, null)
+                builder.setOnDismissListener(DialogInterface.OnDismissListener { })
+                builder.show()
+            }
         }
-
-        mPlayerAdapter.release()
     }
 
-    fun toggleCounting(view: View) {
-        toggleSemaphore.acquire()
-        if (isStarted) {
-            stopCounting()
-        } else {
-            startCounting()
+    fun close(view: View) {
+        Intent(this, CadenceAudioPlayerService::class.java).also { intent ->
+            stopService(intent)
         }
-        toggleSemaphore.release()
-    }
-
-    private fun startCounting() {
-        Intent(this, CadenceTrackerService::class.java).also { intent ->
-            startService(intent)
+        Intent(this, CadenceTrackerEsenseService::class.java).also { intent ->
+            stopService(intent)
         }
-        val button = findViewById<Button>(R.id.button2)
-        isStarted = true
-        button.text = "Stop"
-    }
-
-    private fun stopCounting() {
         Intent(this, CadenceTrackerService::class.java).also { intent ->
             stopService(intent)
         }
-        val button = findViewById<Button>(R.id.button2)
-        isStarted = false
-        button.text = "Start"
+        Intent(this, CadenceTrackerAccelerometerService::class.java).also { intent ->
+            stopService(intent)
+        }
+        finish()
     }
 
-    private fun initializeUI() {
-        mTextDebug = findViewById<TextView>(R.id.textView)
+    private fun registerReceivers() {
+        val stepReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent == null) {
+                    throw IllegalArgumentException("Intent cannot be null.")
+                }
+                val stepsPerMinute = intent.getDoubleExtra("STEPS_PER_MINUTE", -1.0)
+                val totalStepsTaken = intent.getIntExtra("TOTAL_STEPS_TAKEN", -1)
 
-        val mPlayButton = findViewById<Button>(R.id.play_button)
-        mPlayButton.text = "130 BPM"
+                if (totalStepsTaken < 0 || stepsPerMinute < 0) {
+                    return
+                }
 
-        val mClearButton = findViewById<Button>(R.id.clear_button)
-        mClearButton.text = "Clear"
+                waitingForStepsLabelTextView.visibility = View.GONE
+                stepsPerMinuteLabelTextView.visibility = View.VISIBLE
+                stepsPerMinuteView.visibility = View.VISIBLE
+                totalStepsTakenView.visibility = View.VISIBLE
+                totalStepsTakenLabelTextView.visibility = View.VISIBLE
 
-        val mResetButton = findViewById<Button>(R.id.reset_button)
-        mResetButton.text = "138 BPM"
-
-        mPlayButton.setOnClickListener {
-//            mPlayerAdapter.play()
-            sendBroadcast(Intent(ACTION_UPDATE_STEPS_PER_MINUTE).also {
-                it.putExtra("STEPS_PER_MINUTE", 130.0)
-            })
-        }
-        mClearButton.setOnClickListener {
-            mTextDebug.text = ""
-        }
-        mResetButton.setOnClickListener {
-//            mPlayerAdapter.reset()
-            sendBroadcast(Intent(ACTION_UPDATE_STEPS_PER_MINUTE).also {
-                it.putExtra("STEPS_PER_MINUTE", 138.0)
-            })
-        }
-
-    }
-
-    private fun initializePlaybackController() {
-        val mMediaPlayerHolder = MediaPlayerHolder(this)
-        mMediaPlayerHolder.setPlaybackInfoListener(PlaybackListener())
-        mPlayerAdapter = mMediaPlayerHolder
-    }
-
-    private fun initializeVoice() {
-        val mVoiceCommandHandler = VoiceCommandAdapter(this);
-        mVoiceRecognizer = mVoiceCommandHandler;
-    }
-
-    inner class PlaybackListener : PlaybackInfoListener() {
-        override fun onStateChanged(@State state: Int) {
-            val stateToString = convertStateToString(state)
-            onLogUpdated(String.format("onStateChanged(%s)", stateToString))
-        }
-
-        override fun onPlaybackCompleted() {
-            onLogUpdated("Playback Completed")
-        }
-
-        override fun onLogUpdated(message: String?) {
-            if (mTextDebug != null) {
-                mTextDebug.append(message)
-                mTextDebug.append("\n")
+                totalStepsTakenView.text = totalStepsTaken.toString()
+                stepsPerMinuteView.text = stepsPerMinute.toInt().toString()
             }
         }
+        broadcastReceivers.add(stepReceiver)
+        registerReceiver(stepReceiver, IntentFilter(ACTION_UPDATE_STEPS_PER_MINUTE).also {
+            it.addAction(ACTION_SEND_STEPS_PER_MINUTE)
+        })
+
+        val audioStateReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent == null) {
+                    throw IllegalArgumentException("Intent cannot be null.")
+                }
+                val trackBpm = intent.getIntExtra("CURRENT_TRACK_BPM", -1)
+                val trackName = intent.getStringExtra("CURRENT_TRACK_NAME")
+                val isLoading = intent.getBooleanExtra("IS_LOADING", false)
+                val isPaused = intent.getBooleanExtra("IS_PAUSED", false)
+                val audioSessionId = intent.getIntExtra("AUDIO_SESSION_ID", -1)
+
+                if (audioSessionId < 0) {
+                    return
+                }
+
+                try {
+                    visualiserView.setAudioSessionId(audioSessionId)
+                } catch (re: RuntimeException) {
+                    // No permissions
+                }
+
+                if (isLoading) {
+                    songBpmTextView.text = ""
+                    songTitleTextView.text = "Loading next track..."
+                    playPauseButton.isEnabled = false
+                    return
+                }
+
+                if (trackBpm < 0 || trackName == null) {
+                    songTitleTextView.text = "Waiting for pace..."
+                    songTitleTextView.text = "Please start walking or running"
+                    playPauseButton.isEnabled = false
+                    return
+                }
+
+
+                songTitleTextView.text = trackName
+                songBpmTextView.text = "$trackBpm Beats Per Minute"
+
+                playPauseButton.isEnabled = true
+                playPauseButton.icon =
+                    getDrawable(if (isPaused) R.drawable.ic_play_arrow_black_18dp else R.drawable.ic_pause_24px)
+                playPauseButton.setOnClickListener {
+                    sendBroadcast(Intent(if (isPaused) ACTION_PLAY_AUDIO else ACTION_PAUSE_AUDIO))
+                }
+            }
+        }
+
+        broadcastReceivers.add(audioStateReceiver)
+        registerReceiver(audioStateReceiver, IntentFilter(ACTION_AUDIO_STATE_UPDATED))
     }
 
     companion object {
         private val PERMISSION_REQUEST_FINE_LOCATION = 1
         private val PERMISSION_REQUEST_BACKGROUND_LOCATION = 2
-        private val PERMISSION_REQUEST_ACTIVITY_RECOGNITION = 2
+        private val PERMISSION_REQUEST_ACTIVITY_RECOGNITION = 3
+        private val PERMISSION_REQUEST_RECORD_AUDIO = 4
     }
 }
 

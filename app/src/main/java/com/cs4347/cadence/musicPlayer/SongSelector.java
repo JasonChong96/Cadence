@@ -6,7 +6,6 @@ import com.cs4347.cadence.R;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.TreeMap;
 
 public class SongSelector {
@@ -46,7 +45,7 @@ public class SongSelector {
 
     }
 
-    private int getBestFitBpm(int bpm) {
+    public int getBestFitBpm(int bpm) {
         int doubleTimeBpm = 2 * bpm;
 
         int[] differences = new int[4];
@@ -81,8 +80,6 @@ public class SongSelector {
                 min_index = i;
             }
         }
-        System.out.println(Arrays.toString(differences));
-        System.out.println(min_index);
 
         return differences[min_index];
     }
