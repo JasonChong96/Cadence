@@ -9,7 +9,7 @@ This application was only tested on a few Android phones and there may be possib
 If you're facing any strange bugs, go to Settings > Applications > Cadence and enable all permissions for Cadence. They are required for Cadence's core functionalities to work. 
 
 ## Simplified Architechture Diagram
-![Image of Simplified Architechture Diagram](/simplified-architechture-diagram.png)
+![Image of Simplified Architechture Diagram](/simplified_architechture_diagram.png)
 
 ## Files of Interest
 
