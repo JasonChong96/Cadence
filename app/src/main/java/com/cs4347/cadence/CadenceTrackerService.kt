@@ -17,18 +17,38 @@ import com.cs4347.cadence.sensor.StepListener
 import com.cs4347.cadence.sensor.StepSensor
 import com.cs4347.cadence.sensor.StepSensorInbuilt
 
-
+// CadenceTrackerService handles the tracking of steps per minute.
+// This can be subclassed to implement different tracking methods.
 open class CadenceTrackerService : Service(),
     StepListener {
+    // Channel ID for notifications
     private var channelId: String? = null
+
+    // Notification builder for Foreground service
     private var builder: Notification.Builder? = null
+
+    // Timestamp in which the last step was taken
     private var lastStepTime = 0L
+
+    // Index in lastStepDeltas in which the last step's timing was stored
     private var lastStepIndex = 0
+
+    // An array storing the time taken for the past 10 steps
     private var lastStepDeltas = LongArray(DELTA_TIME_BUFFER_SIZE) { -1 }
+
+    // The time taken for the previous step to be taken
     private var lastStepDelta = -1L
+
+    // Step sensor which will call the callback function when a step is detected
     private var stepSensor: StepSensor? = null
+
+    // Device name of bluetooth device (if needed)
     protected var deviceName: String = ESENSE_DEVICE_NAME
+
+    // Total number of steps detected
     private var numSteps = 0
+
+    // Handlers for messages received through Broadcasts API
     private var broadcastReceiver: BroadcastReceiver? = null
 
 
@@ -82,6 +102,7 @@ open class CadenceTrackerService : Service(),
         return StepSensorInbuilt(this)
     }
 
+    // Called when step sensor detects a step taken
     override fun step(timeNs: Long) {
         this.numSteps++
         val delta = if (lastStepTime != 0L) (timeNs - lastStepTime) else 0

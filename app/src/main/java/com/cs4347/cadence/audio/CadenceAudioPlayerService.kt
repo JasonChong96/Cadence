@@ -33,10 +33,19 @@ import kotlin.properties.Delegates
 
 // CadenceAudioPlayerService handles Audio Playback
 class CadenceAudioPlayerService : Service() {
+    // Notification for Foreground Service
     private var builder: Notification.Builder? = null
+
+    // Channel ID for notification
     private var channelId: String? = null
+
+    // AudioTrack API used for playback
     private var audioTrack: AudioTrack? = null
+
+    // songLibrary determines which song set to play
     private val songLibrary = SongSelector()
+
+    // The current loaded song set
     private var currentSongSet by Delegates.observable<LoadedTimeShiftedSong?>(null) { _, _, _ ->
         broadcastState()
     }
@@ -48,17 +57,33 @@ class CadenceAudioPlayerService : Service() {
     // curWritingIndex is the start index in the current song of the next buffer to be written to the
     // audioTrack
     private var curWritingIndex = 0
+
+    // The currently playing song
     private var currentSong by Delegates.observable<LoadedSong?>(null) { _, _, _ ->
         broadcastState()
     }
+
+    // Mutex used to prevent race conditions between onPeriodicCallback and bpmChanged
     private var bufferMutex = PrioLock()
+
+    // Timestamp of the last time bpmChanged was called.
     private var lastBpmChangeTime: Long = 0
+
+    // Timestamp of the last time the last song set was loaded
     private var lastSongChangeTime: Long = 0
+
+    // Boolean representing whether the service is currently decoding a new song set
     private var isLoading: Boolean by Delegates.observable(false) { _, _, _ ->
         broadcastState()
     }
+
+    // Handlers for messages received from Broadcasts API
     private var broadcastReceivers: MutableList<BroadcastReceiver> = ArrayList()
+
+    // For text to speech feedback
     private lateinit var mSpeechHandler: SpeechAdapter
+
+    // For speech commands
     private lateinit var voiceAdapter: VoiceCommandAdapter
 
     override fun onBind(intent: Intent): IBinder {
