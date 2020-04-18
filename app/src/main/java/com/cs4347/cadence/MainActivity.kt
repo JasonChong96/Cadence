@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    // Request for bluetooth permissions if required.
     private fun checkAndRequestBluetooth() {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED
@@ -118,6 +119,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Request for Activity Recognition permission if required. This is required for the step
+    // detector to work on later versions of Android.
     private fun checkAndRequestActivityRecognition() {
         if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
             != PackageManager.PERMISSION_GRANTED
@@ -145,6 +148,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Request Audio Record permission if needed. This is required for visualization to work.
     private fun checkAndRequestAudioRecord() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
@@ -172,6 +176,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Stop all related services and close this activity.
     fun close(view: View) {
         Intent(this, CadenceAudioPlayerService::class.java).also { intent ->
             stopService(intent)
@@ -188,6 +193,7 @@ class MainActivity : AppCompatActivity() {
         finish()
     }
 
+    // Registers broadcast receivers
     private fun registerReceivers() {
         val stepReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -276,7 +282,7 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-
+// This is a quick hack to make the bluetooth picker work. Only used for eSense.
 class ActivityCodeBuilder(private val activity: Activity, private val code: Int) :
     BluetoothConfig.Builder(activity) {
     override fun start() {

@@ -46,7 +46,7 @@ class CadenceAudioPlayerService : Service() {
     private val songLibrary = SongSelector()
 
     // The current loaded song set
-    private var currentSongSet by Delegates.observable<LoadedTimeShiftedSong?>(null) { _, _, _ ->
+    private var currentSongSet by Delegates.observable<LoadedTimeShiftedSongSet?>(null) { _, _, _ ->
         broadcastState()
     }
 
@@ -113,6 +113,7 @@ class CadenceAudioPlayerService : Service() {
         super.onDestroy()
     }
 
+    // Initialize AudioTrack instance with appropriate parameters.
     private fun initializeAudioTrack() {
         val audioTrack = AudioTrack.Builder()
             .setAudioAttributes(
@@ -152,6 +153,7 @@ class CadenceAudioPlayerService : Service() {
         this.audioTrack = audioTrack
     }
 
+    // Registers receivers for Broadcasts API
     private fun registerBroadcastReceivers() {
         val stepsReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -191,6 +193,7 @@ class CadenceAudioPlayerService : Service() {
         registerReceiver(pauseRequestReceiver, IntentFilter(ACTION_PAUSE_AUDIO))
     }
 
+    // Attempt to pause current playback
     private fun tryPause() {
         if (isLoading) {
             return
@@ -206,6 +209,7 @@ class CadenceAudioPlayerService : Service() {
         }
     }
 
+    // Attempt to resume playback from paused state
     private fun tryResumeFromPause() {
         if (isLoading) {
             return
@@ -230,7 +234,8 @@ class CadenceAudioPlayerService : Service() {
         }
     }
 
-    private fun loadAndAssignNextSong(bpm: Int): LoadedTimeShiftedSong {
+    // Load next song set into memory and assigns it to this.currentSongSet
+    private fun loadAndAssignNextSong(bpm: Int): LoadedTimeShiftedSongSet {
         mSpeechHandler.speak("Loading next song set.")
         this.isLoading = true
         this.currentSongSet = null
@@ -244,7 +249,7 @@ class CadenceAudioPlayerService : Service() {
                 loadSongById(id, resourceBpm[i])
             }
 
-        val result = LoadedTimeShiftedSong(loadedSongs[0], loadedSongs[1], loadedSongs[2])
+        val result = LoadedTimeShiftedSongSet(loadedSongs[0], loadedSongs[1], loadedSongs[2])
         this.currentSongSet = result
 
         this.isLoading = false
@@ -252,6 +257,7 @@ class CadenceAudioPlayerService : Service() {
         return result
     }
 
+    // Load song by resource ID into PCM 16-bit format
     private fun loadSongById(id: Int, bpm: Int): LoadedSong {
         val assetFileDescriptor: AssetFileDescriptor =
             resources.openRawResourceFd(id)
@@ -391,7 +397,8 @@ class CadenceAudioPlayerService : Service() {
         return channelId
     }
 
-    private fun getAppropriateLoadedTrack(songs: LoadedTimeShiftedSong, bpm: Int): LoadedSong {
+    // Get the most appropriate song out of the input song set that best matches the input bpm.
+    private fun getAppropriateLoadedTrack(songs: LoadedTimeShiftedSongSet, bpm: Int): LoadedSong {
         val loadedSongs = arrayOf(songs.slow, songs.original, songs.fast)
 
         return loadedSongs.minBy {
@@ -399,6 +406,7 @@ class CadenceAudioPlayerService : Service() {
         } ?: throw IllegalArgumentException("No loaded songs.")
     }
 
+    // Called when the users' steps per minute is changed.
     @Synchronized
     private fun bpmChanged(bpm: Int) {
         if (isLoading || System.currentTimeMillis() - lastBpmChangeTime < MIN_BPM_CHECK_INTERVAL) {
@@ -463,6 +471,7 @@ class CadenceAudioPlayerService : Service() {
         }
     }
 
+    // Flush audio track buffers and reset index counters.
     private fun reset() {
         audioTrack?.flush()
         this.curWritingIndex = 0
@@ -470,6 +479,7 @@ class CadenceAudioPlayerService : Service() {
         audioTrack?.play()
     }
 
+    // Write the next buffers from the currently playing song into the AudioTrack API
     private fun writeNextBuffers(numBuffers: Int = 1) {
         val currentlyPlaying = this.currentSong ?: return
         for (i in 1..numBuffers) {
@@ -489,6 +499,7 @@ class CadenceAudioPlayerService : Service() {
         }
     }
 
+    // Periodically called when the AudioTrack API is playing back audio
     private fun onPeriodicPlayback(track: AudioTrack) {
         bufferMutex.lock()
         try {
@@ -516,6 +527,8 @@ class CadenceAudioPlayerService : Service() {
         }
     }
 
+    // Broadcasts the current state of this service. This is mainly used for the GUI to display
+    // the state to users.
     private fun broadcastState() {
         sendBroadcast(Intent(ACTION_AUDIO_STATE_UPDATED).also {
             it.putExtra("CURRENT_TRACK_NAME", currentSong?.name)

@@ -7,6 +7,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 
+// Main implementation for StepSensor that uses the built-in step detector on smartphones.
 class StepSensorInbuilt(context: Context) : SensorEventListener,
     StepSensor() {
     private val sensorManager = context.getSystemService(Service.SENSOR_SERVICE) as SensorManager

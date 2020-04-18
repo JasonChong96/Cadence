@@ -7,6 +7,8 @@ import io.esense.esenselib.ESenseConnectionListener
 import io.esense.esenselib.ESenseEventListener
 import io.esense.esenselib.ESenseManager
 
+// An implementation of StepSensor that uses the eSense accelerometer. This is currently unused.
+// It was merely for exploration purposes.
 class StepSensorEsense(context: Context, deviceName: String) : StepSensor() {
     private var accelRingCounter = 0
     private val accelRingX =
