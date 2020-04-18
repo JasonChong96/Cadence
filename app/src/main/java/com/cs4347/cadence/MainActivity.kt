@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.speech.tts.Voice
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
@@ -17,8 +18,9 @@ import com.bluetoothscanning.Config
 import com.cs4347.cadence.audio.CadenceAudioPlayerService
 import com.cs4347.cadence.musicPlayer.MediaPlayerHolder
 import com.cs4347.cadence.musicPlayer.PlaybackInfoListener
+import com.cs4347.cadence.voice.SpeechHandler
+import com.cs4347.cadence.voice.VoiceCommandAdapter
 import java.util.concurrent.Semaphore
-import kotlin.math.roundToInt
 
 
 class MainActivity : AppCompatActivity() {
@@ -26,6 +28,7 @@ class MainActivity : AppCompatActivity() {
     private var toggleSemaphore = Semaphore(1)
 
     private lateinit var mPlayerAdapter: MediaPlayerHolder
+    private lateinit var mVoiceRecognizer: VoiceCommandAdapter
     lateinit var mTextDebug: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +40,7 @@ class MainActivity : AppCompatActivity() {
         button.text = "Stop"
         initializeUI()
         initializePlaybackController()
+        initializeVoice()
         Intent(this, CadenceAudioPlayerService::class.java).also { intent ->
             startService(intent)
         }
@@ -225,6 +229,11 @@ class MainActivity : AppCompatActivity() {
         val mMediaPlayerHolder = MediaPlayerHolder(this)
         mMediaPlayerHolder.setPlaybackInfoListener(PlaybackListener())
         mPlayerAdapter = mMediaPlayerHolder
+    }
+
+    private fun initializeVoice() {
+        val mVoiceCommandHandler = VoiceCommandAdapter(this);
+        mVoiceRecognizer = mVoiceCommandHandler;
     }
 
     inner class PlaybackListener : PlaybackInfoListener() {

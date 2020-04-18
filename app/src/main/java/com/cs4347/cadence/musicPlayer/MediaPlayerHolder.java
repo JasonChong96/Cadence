@@ -5,6 +5,7 @@ import android.content.res.AssetFileDescriptor;
 import android.media.MediaPlayer;
 
 import com.cs4347.cadence.MainActivity;
+import com.cs4347.cadence.voice.SpeechHandler;
 
 import java.util.Locale;
 import java.util.concurrent.Executors;
@@ -24,9 +25,11 @@ public class MediaPlayerHolder implements PlayerAdapter {
     private Runnable mSeekbarPositionUpdateTask;
     private SongSelector songLibrary;
     private long lastLoadTime;
+    private SpeechHandler mSpeechHandler;
 
     public MediaPlayerHolder(Context context) {
         mContext = context.getApplicationContext();
+        mSpeechHandler = new SpeechHandler(context);
     }
 
 
@@ -204,6 +207,7 @@ public class MediaPlayerHolder implements PlayerAdapter {
     }
 
     synchronized public void updateBpm(int newBpm) {
+        mSpeechHandler.speak(newBpm);
         logToUI(String.format(Locale.ENGLISH, "BGM Updated %d. Should change bpm: %b. Time from last: %d",
                 newBpm, songLibrary.isShouldChangeBpm(newBpm), System.currentTimeMillis() - lastLoadTime));
         if (System.currentTimeMillis() - lastLoadTime < SONG_CHANGE_INTERVAL || !songLibrary.isShouldChangeBpm(newBpm)) {
