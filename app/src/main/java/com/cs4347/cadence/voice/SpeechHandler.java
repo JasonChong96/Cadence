@@ -28,7 +28,7 @@ public class SpeechHandler implements SpeechAdapter {
             }
         });
         params = new Bundle();
-        params.putCharSequence(TextToSpeech.Engine.KEY_PARAM_VOLUME, "200");
+        params.putCharSequence(TextToSpeech.Engine.KEY_PARAM_VOLUME, "400");
     }
     @Override
     public void speak(String content) {
