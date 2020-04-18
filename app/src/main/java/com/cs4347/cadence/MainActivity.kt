@@ -15,13 +15,8 @@ import androidx.appcompat.app.AppCompatActivity
 import com.bluetoothscanning.BluetoothConfig
 import com.bluetoothscanning.Config
 import com.cs4347.cadence.audio.CadenceAudioPlayerService
-import com.cs4347.cadence.musicPlayer.MediaPlayerHolder
-import com.cs4347.cadence.musicPlayer.PlaybackInfoListener
-import com.cs4347.cadence.voice.SpeechHandler
-import com.cs4347.cadence.voice.VoiceCommandAdapter
 import com.gauravk.audiovisualizer.model.AnimSpeed
 import kotlinx.android.synthetic.main.cadence_activity_main.*
-import java.util.concurrent.Semaphore
 
 
 class MainActivity : AppCompatActivity() {

@@ -1,10 +1,9 @@
 package com.cs4347.cadence.voice;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.os.AsyncTask;
-import android.os.Bundle;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,7 +14,10 @@ import edu.cmu.pocketsphinx.RecognitionListener;
 import edu.cmu.pocketsphinx.SpeechRecognizer;
 import edu.cmu.pocketsphinx.SpeechRecognizerSetup;
 
-public class VoiceCommandAdapter extends Activity implements RecognitionListener {
+import static com.cs4347.cadence.CadenceIntentConstants.ACTION_PAUSE_AUDIO;
+import static com.cs4347.cadence.CadenceIntentConstants.ACTION_PLAY_AUDIO;
+
+public class VoiceCommandAdapter implements RecognitionListener {
 
     private Context mContext;
 
@@ -31,10 +33,6 @@ public class VoiceCommandAdapter extends Activity implements RecognitionListener
 
     public VoiceCommandAdapter(Context context) {
         mContext = context.getApplicationContext();
-    }
-    @Override
-    public void onCreate(Bundle state) {
-        super.onCreate(state);
         runRecognizerSetup();
     }
 
@@ -46,7 +44,7 @@ public class VoiceCommandAdapter extends Activity implements RecognitionListener
             @Override
             protected Exception doInBackground(Void... params) {
                 try {
-                    Assets assets = new Assets(VoiceCommandAdapter.this);
+                    Assets assets = new Assets(mContext);
                     File assetDir = assets.syncAssets();
                     setupRecognizer(assetDir);
                 } catch (IOException e) {
@@ -88,9 +86,9 @@ public class VoiceCommandAdapter extends Activity implements RecognitionListener
         } else if (text.equals(KWS_STOP)) {
             System.out.println("Stopping the audio");
         } else if (text.equals(KWS_PAUSE)) {
-            System.out.println("Pausing the audio");
+            mContext.sendBroadcast(new Intent(ACTION_PAUSE_AUDIO));
         } else if (text.equals(KWS_PLAY)) {
-            System.out.println("Play the audio");
+            mContext.sendBroadcast(new Intent(ACTION_PLAY_AUDIO));
         } else if (text.equals(KWS_NEXT)) {
             System.out.println("Go to the next audio");
         } else {
@@ -116,10 +114,7 @@ public class VoiceCommandAdapter extends Activity implements RecognitionListener
         switchSearch(KWS_SEARCH);
     }
 
-    @Override
     public void onStop() {
-        super.onStop();
-
         if (recognizer != null) {
             recognizer.cancel();
             recognizer.shutdown();

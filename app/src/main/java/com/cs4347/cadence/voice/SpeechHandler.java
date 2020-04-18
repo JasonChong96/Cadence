@@ -1,7 +1,7 @@
 package com.cs4347.cadence.voice;
 
 import android.content.Context;
-import android.os.Build;
+import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
 
 import java.util.Locale;
@@ -11,12 +11,11 @@ public class SpeechHandler implements SpeechAdapter {
 
     private Context mContext;
     private TextToSpeech textToSpeech;
+    private Bundle params;
 
     // Some reserved text to update the BPM
     private String[] reservedSentence = {
-            "Your current speed is %d beat per minute",
-            "Your are running at %d beat per minute",
-            "It's %d beat per minute now!"
+            "Song changed to %d beats per minute",
     };
     public SpeechHandler(Context context) {
         mContext = context.getApplicationContext();
@@ -28,14 +27,12 @@ public class SpeechHandler implements SpeechAdapter {
                 }
             }
         });
+        params = new Bundle();
+        params.putCharSequence(TextToSpeech.Engine.KEY_PARAM_VOLUME, "200");
     }
     @Override
     public void speak(String content) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            textToSpeech.speak(content, TextToSpeech.QUEUE_FLUSH, null,null);
-        } else {
-            textToSpeech.speak(content, TextToSpeech.QUEUE_FLUSH, null);
-        }
+        textToSpeech.speak(content, TextToSpeech.QUEUE_FLUSH, params,null);
     }
 
     @Override
