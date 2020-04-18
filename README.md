@@ -13,7 +13,7 @@ If you're facing any strange bugs, go to Settings > Applications > Cadence and e
 The main files of interest are in the following packages:
 * com.cs4347.cadence
 * com.cs4347.cadence.audio
-* com.cs4347.sensor
-* com.cs4347.voice
+* com.cs4347.cadence.sensor
+* com.cs4347.cadence.voice
 
 The rest of the unused files were left in the source code as proof of our exploration and experimentation
