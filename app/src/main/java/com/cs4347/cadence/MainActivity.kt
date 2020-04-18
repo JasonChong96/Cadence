@@ -18,7 +18,7 @@ import com.cs4347.cadence.audio.CadenceAudioPlayerService
 import com.gauravk.audiovisualizer.model.AnimSpeed
 import kotlinx.android.synthetic.main.cadence_activity_main.*
 
-
+// MainActivity is responsible for the Cadence GUI
 class MainActivity : AppCompatActivity() {
     private var isStarted = false
     private val broadcastReceivers: MutableList<BroadcastReceiver> = ArrayList()

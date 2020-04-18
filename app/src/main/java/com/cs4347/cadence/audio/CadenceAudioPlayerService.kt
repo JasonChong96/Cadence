@@ -31,18 +31,24 @@ import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.properties.Delegates
 
-
+// CadenceAudioPlayerService handles Audio Playback
 class CadenceAudioPlayerService : Service() {
     private var builder: Notification.Builder? = null
     private var channelId: String? = null
     private var audioTrack: AudioTrack? = null
     private val songLibrary = SongSelector()
-    private var currentSong by Delegates.observable<LoadedTimeShiftedSong?>(null) { _, _, _ ->
+    private var currentSongSet by Delegates.observable<LoadedTimeShiftedSong?>(null) { _, _, _ ->
         broadcastState()
     }
+
+    // lastAudioTrackIndex is the index of the last byte written to audioTrack relative to the first
+    // byte written after the audioTrack was last flushed
     private var lastAudioTrackIndex = 0
+
+    // curWritingIndex is the start index in the current song of the next buffer to be written to the
+    // audioTrack
     private var curWritingIndex = 0
-    private var currentlyPlaying by Delegates.observable<LoadedSong?>(null) { _, _, _ ->
+    private var currentSong by Delegates.observable<LoadedSong?>(null) { _, _, _ ->
         broadcastState()
     }
     private var bufferMutex = PrioLock()
@@ -202,7 +208,7 @@ class CadenceAudioPlayerService : Service() {
     private fun loadAndAssignNextSong(bpm: Int): LoadedTimeShiftedSong {
         mSpeechHandler.speak("Loading next song set.")
         this.isLoading = true
-        this.currentSong = null
+        this.currentSongSet = null
         val nextSongInfo = songLibrary.getNextSong(bpm)
         val resourceIds = arrayOf(nextSongInfo.slowId, nextSongInfo.originalId, nextSongInfo.fastId)
         val resourceBpm =
@@ -214,7 +220,7 @@ class CadenceAudioPlayerService : Service() {
             }
 
         val result = LoadedTimeShiftedSong(loadedSongs[0], loadedSongs[1], loadedSongs[2])
-        this.currentSong = result
+        this.currentSongSet = result
 
         this.isLoading = false
         this.lastSongChangeTime = System.currentTimeMillis()
@@ -377,13 +383,16 @@ class CadenceAudioPlayerService : Service() {
         CompletableFuture.runAsync {
             bufferMutex.lockPriority()
             try {
-                var loadedSongs = this.currentSong ?: loadAndAssignNextSong(bpm)
+                // Load a song set if uninitialized
+                var loadedSongs = this.currentSongSet ?: loadAndAssignNextSong(bpm)
 
-                val currentlyPlaying = this.currentlyPlaying
+                val currentlyPlaying = this.currentSong
                 var closestLoadedTrack = getAppropriateLoadedTrack(loadedSongs, bpm)
 
                 if (currentlyPlaying == null) {
-                    this.currentlyPlaying = closestLoadedTrack
+                    // If there is no song currently loaded, then start playing the msot appropriate
+                    // track.
+                    this.currentSong = closestLoadedTrack
                     audioTrack?.play()
                     writeNextBuffers()
                     return@runAsync
@@ -402,9 +411,10 @@ class CadenceAudioPlayerService : Service() {
                 )
 
                 if (shouldChangeSongSet) {
+                    // Song set is changed if there is a more appropriate song set
                     loadedSongs = loadAndAssignNextSong(bpm)
                     closestLoadedTrack = getAppropriateLoadedTrack(loadedSongs, bpm)
-                    this.currentlyPlaying = closestLoadedTrack
+                    this.currentSong = closestLoadedTrack
                     reset()
                     writeNextBuffers()
                     mSpeechHandler.speak(closestLoadedTrack.bpm)
@@ -412,9 +422,12 @@ class CadenceAudioPlayerService : Service() {
                 }
 
                 if (closestLoadedTrack.bpm == currentlyPlaying.bpm) {
+                    // No need to change songs.
                     return@runAsync
                 }
-                this.currentlyPlaying = closestLoadedTrack
+
+                // Change current song within the song set
+                this.currentSong = closestLoadedTrack
                 curWritingIndex =
                     (round((currentlyPlaying.bpm.toDouble() / closestLoadedTrack.bpm.toDouble()) * curWritingIndex).toInt()) / 4 * 4
                 writeNextBuffers()
@@ -433,7 +446,7 @@ class CadenceAudioPlayerService : Service() {
     }
 
     private fun writeNextBuffers(numBuffers: Int = 1) {
-        val currentlyPlaying = this.currentlyPlaying ?: return
+        val currentlyPlaying = this.currentSong ?: return
         for (i in 1..numBuffers) {
             val bytesRemaining = currentlyPlaying.samples.size - curWritingIndex
             if (bytesRemaining <= 0) {
@@ -454,7 +467,7 @@ class CadenceAudioPlayerService : Service() {
     private fun onPeriodicPlayback(track: AudioTrack) {
         bufferMutex.lock()
         try {
-            val currentlyPlaying = this@CadenceAudioPlayerService.currentlyPlaying
+            val currentlyPlaying = this@CadenceAudioPlayerService.currentSong
                 ?: throw IllegalStateException("currentlyPlaying is null on callback.")
             val bytesRemaining =
                 currentlyPlaying.samples.size - this@CadenceAudioPlayerService.curWritingIndex
@@ -464,7 +477,7 @@ class CadenceAudioPlayerService : Service() {
             )
             if (bytesRemaining <= 0) {
                 val newSongSet = loadAndAssignNextSong(currentlyPlaying.bpm)
-                this@CadenceAudioPlayerService.currentlyPlaying =
+                this@CadenceAudioPlayerService.currentSong =
                     getAppropriateLoadedTrack(newSongSet, currentlyPlaying.bpm)
                 reset()
             }
@@ -480,8 +493,8 @@ class CadenceAudioPlayerService : Service() {
 
     private fun broadcastState() {
         sendBroadcast(Intent(ACTION_AUDIO_STATE_UPDATED).also {
-            it.putExtra("CURRENT_TRACK_NAME", currentlyPlaying?.name)
-            it.putExtra("CURRENT_TRACK_BPM", currentlyPlaying?.bpm)
+            it.putExtra("CURRENT_TRACK_NAME", currentSong?.name)
+            it.putExtra("CURRENT_TRACK_BPM", currentSong?.bpm)
             it.putExtra("AUDIO_SESSION_ID", audioTrack?.audioSessionId)
             it.putExtra("IS_PAUSED", audioTrack?.playState == AudioTrack.PLAYSTATE_PAUSED)
             it.putExtra("IS_LOADING", isLoading)
