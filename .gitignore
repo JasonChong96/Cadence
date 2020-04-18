@@ -4,6 +4,8 @@
 *.ap_
 *.aab
 
+!*pocketsphinx-android-5prealpha-release.aar
+
 # Files for the ART/Dalvik VM
 *.dex
 

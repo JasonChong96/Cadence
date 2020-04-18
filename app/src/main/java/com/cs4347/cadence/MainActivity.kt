@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.speech.tts.Voice
 import android.view.View
 import android.widget.Button
 import androidx.appcompat.app.AlertDialog
@@ -16,9 +17,8 @@ import com.bluetoothscanning.Config
 import com.cs4347.cadence.audio.CadenceAudioPlayerService
 import com.gauravk.audiovisualizer.model.AnimSpeed
 import kotlinx.android.synthetic.main.cadence_activity_main.*
-import java.util.concurrent.Semaphore
 
-
+// MainActivity is responsible for the Cadence GUI
 class MainActivity : AppCompatActivity() {
     private var isStarted = false
     private val broadcastReceivers: MutableList<BroadcastReceiver> = ArrayList()
